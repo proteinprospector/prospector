@@ -1,0 +1,23 @@
+#!/bin/bash
+mkdir bin
+mkdir btag-daemon
+mkdir faindex
+mkdir include
+mkdir jobStatus
+mkdir kill
+mkdir lib
+mkdir libdbase
+mkdir libexpat
+mkdir libgen
+mkdir libnrec
+mkdir libprocess
+mkdir libraw
+mkdir libsqlite
+mkdir libucsf
+mkdir libzip
+mkdir msbatch
+mkdir msdisplay
+mkdir msform
+mkdir mssearch
+mkdir readDB
+mkdir searchCompare
