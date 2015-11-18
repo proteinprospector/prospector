@@ -119,6 +119,18 @@ double AAInfo::getModMonoisotopicMass ( const string& aa ) const
 				return mod;
 			}
 		}
+		else {
+			int len = aa.length ();
+			if ( len > 3 ) { 
+				string aa2 = aa.substr ( len - 4, 3 );
+				string aa3 = string ( "(" ) + aa [0] + string ( ")" );		// Protein Pilot style mods
+				if ( aa2 == aa3 ) {
+					string aa4 = aa.substr ( 0, len - 4 ) + ')';
+					i = modMonoisotopicMass.find ( aa4 );
+					if ( i != modMonoisotopicMass.end () ) return i->second;
+				}
+			}
+		}
 		string err ( "Undefined amino acid " );
 		err += aa;
 		err += ".";
@@ -139,7 +151,19 @@ double AAInfo::getModAverageMass ( const string& aa ) const
 				return mod;
 			}
 		}
-		std::string err ( "Undefined amino acid " );
+		else {
+			int len = aa.length ();
+			if ( len > 3 ) { 
+				string aa2 = aa.substr ( len - 4, 3 );
+				string aa3 = string ( "(" ) + aa [0] + string ( ")" );		// Protein Pilot style mods
+				if ( aa2 == aa3 ) {
+					string aa4 = aa.substr ( 0, len - 4 ) + ')';
+					i = modAverageMass.find ( aa4 );
+					if ( i != modAverageMass.end () ) return i->second;
+				}
+			}
+		}
+		string err ( "Undefined amino acid " );
 		err += aa;
 		err += ".";
 		throw std::runtime_error ( err );

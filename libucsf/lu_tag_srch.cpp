@@ -127,6 +127,7 @@ TagSearch::TagSearch ( MSTagParameters& params ) :
 	compMaskTypeAnd = enzymeParameters.getCompMaskType () == "AND";
 	compMaskTypeOr = enzymeParameters.getCompMaskType () == "OR";
 	initNonSpecific ( params );
+	modTable = MSTagSearchAllowErrors::getModificationTable ();
 }
 TagSearch::~TagSearch ()
 {
@@ -384,6 +385,7 @@ NoEnzymeSearch::~NoEnzymeSearch () {}
 void NoEnzymeSearch::tag_search ( const FrameIterator& fi, const char* frame )
 {
 	const IntVector& cleavageIndex = ( allowNonSpecificType == 'E' ) ? IntVector () : enzyme_fragmenter ( frame );
+	if ( modTable ) modTable->setMotifSites ( frame );
 	int num_aa = strlen ( frame );
 	double* startProtein = get_protein_double_mass_array ( frame );
 	double* endProtein = startProtein + num_aa;
@@ -410,6 +412,7 @@ void NoEnzymeSearch::tag_search ( const FrameIterator& fi, const char* frame )
 						int e = end-startProtein;
 						if ( !checkD || ( s != 0 && frame [s-1] == 'D' ) ) {
 							if ( nonSpecificTermini ( cleavageIndex, s, e ) ) {
+								if ( modTable ) modTable->setMotifFlags ( s+1, e+1 );
 								string possMatch ( &frame [s], end - start );
 								if ( msMSSearch [i]->doMatch ( possMatch, ( start == startProtein ), ( end == endProtein ), sum, tagMatch, tagHits->getMinScore ( i ) ) ) {
 									if ( !compMask || checkComposition ( possMatch ) ) {
@@ -453,6 +456,7 @@ NoEnzymeIntSearch::~NoEnzymeIntSearch () {}
 void NoEnzymeIntSearch::tag_search ( const FrameIterator& fi, const char* frame )
 {
 	const IntVector& cleavageIndex = ( allowNonSpecificType == 'E' ) ? IntVector () : enzyme_fragmenter ( frame );
+	if ( modTable ) modTable->setMotifSites ( frame );
 	int num_aa = strlen ( frame );
 	int* startProtein = get_protein_int_mass_array ( frame );
 	int* endProtein = startProtein + num_aa;
@@ -516,6 +520,7 @@ void NoEnzymeIntSearch::tag_search ( const FrameIterator& fi, const char* frame 
 void NoEnzymeIntSearch::tag_search ( const FrameIterator& fi, const char* frame )
 {
 	const IntVector& cleavageIndex = ( allowNonSpecificType == 'E' ) ? IntVector () : enzyme_fragmenter ( frame );
+	if ( modTable ) modTable->setMotifSites ( frame );
 	int num_aa = strlen ( frame );
 	int* startProtein = get_protein_int_mass_array ( frame );
 	int* endProtein = startProtein + num_aa;
@@ -569,6 +574,7 @@ YesEnzymeSearch::~YesEnzymeSearch () {}
 void YesEnzymeSearch::tag_search ( const FrameIterator& fi, const char* frame )
 {
 	IntVector& cleavage_index = enzyme_fragmenter ( frame );
+	if ( modTable ) modTable->setMotifSites ( frame );
 	int numEnzymeFragments = cleavage_index.size ();
 	DoubleVector& enzyme_fragment_mass_array = get_cleaved_masses_to_limit ( frame, cleavage_index, cleavedLimit );
 	int missedCleavageLimit = missedCleavages;
@@ -598,12 +604,13 @@ void YesEnzymeSearch::tag_search ( const FrameIterator& fi, const char* frame )
 							if ( first ) {
 								hitLength = cleavage_index [j] - previousCleavageIndex;
 								possMatch = string ( frame + previousCleavageIndex + 1, hitLength );
+								if ( modTable ) modTable->setMotifFlags ( previousCleavageIndex + 2, previousCleavageIndex + 1 + hitLength );
 								first = false;
 							}
 							if ( !compMask || checkComposition ( possMatch ) ) {
 								bool cTermProt = ( j == numEnzymeFragments-1 );
 								if ( possMatch [hitLength - 1] == 'M' ) possMatch[hitLength-1] = 'h';	//CNBr only
-								if (  msms->doMatch ( possMatch, nTermProt, cTermProt, mol_wt, tagMatch, tagHits->getMinScore ( ind ) ) ) {
+								if ( msms->doMatch ( possMatch, nTermProt, cTermProt, mol_wt, tagMatch, tagHits->getMinScore ( ind ) ) ) {
 									addTagHit ( ind, tagMatch, possMatch, fi, nTermProt ? '-' : frame[previousCleavageIndex], cTermProt ? '-' : frame [cleavage_index[j] + 1], previousCleavageIndex + 2 );
 								}
 							}
@@ -636,6 +643,7 @@ void YesEnzymeSearch::tag_search ( const FrameIterator& fi, const char* frame )
 								if ( first ) {
 									hitLength = cleavage_index [j] - previousCleavageIndex;
 									possMatch = string ( frame + previousCleavageIndex + 1, hitLength );
+									if ( modTable ) modTable->setMotifFlags ( previousCleavageIndex + 2, previousCleavageIndex + 1 + hitLength );
 									first = false;
 								}
 								if ( !compMask || checkComposition ( possMatch ) ) {

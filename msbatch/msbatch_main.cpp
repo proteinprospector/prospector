@@ -238,6 +238,10 @@ void batchSubmission ( ostream& os, ParameterList& paramList )
 	paramList.removeName ( "output_filename" );					// Search results file.
 	paramList.removeName ( "msms_mod_AA_list" );				// These options are used to load the variable mods
 	paramList.removeName ( "msms_mod_AA_types" );				// and shouldn't be saved.
+	paramList.removeName ( "mod_AA_limit" );
+	paramList.removeName ( "mod_AA_file" );
+	paramList.removeName ( "motif_offset" );
+	paramList.removeName ( "motif" );
 	string projectID = MySQLPPSDDBase::instance ().getProjectID ( userID, projectName );
 	if ( projectID.empty () ) {
 		genUnlink ( uploadFpath );

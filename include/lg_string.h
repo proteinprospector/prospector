@@ -75,5 +75,6 @@ int genNextInt ( const std::string& s, const std::string& delim, std::string::si
 double genNextDouble ( const std::string& s, const std::string& delim, std::string::size_type& start, std::string::size_type& end );
 StringVector genGetSeparatedValues ( const std::string& s, const std::string& sep );
 std::string genRandomString ( int len );
+StringVector genColumnsFromLine ( const std::string& line, const std::string& separator );
 
 #endif /* ! __lg_string_h */

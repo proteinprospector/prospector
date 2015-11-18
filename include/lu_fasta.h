@@ -15,7 +15,7 @@
 *  the University of California.  Any unauthorized use, reproduction or       *
 *  transfer of this file is strictly prohibited.                              *
 *                                                                             *
-*  Copyright (1996-2014) The Regents of the University of California.         *
+*  Copyright (1996-2015) The Regents of the University of California.         *
 *                                                                             *
 *  All rights reserved.                                                       *
 *                                                                             *
@@ -55,6 +55,7 @@ class FastaServer {
 	int cur;
 	StringVectorSizeType line;
 	void openUserDatabase ( const std::string& filename, bool createIndicies );
+	void openPEFFDatabase ( const std::string& filename, bool createIndicies );
 	void openDatabase ( const std::string& filename, bool createIndicies );
 	std::string getUsedFilename ( const std::string& filename );
 	CommentLine* getCommentLine ( const std::string& usedFileName, DatabaseIndicies* dbIndicies );

@@ -309,6 +309,8 @@ public:
 typedef std::vector <TagHit> TagHitVector;
 typedef TagHitVector::size_type TagHitVectorSizeType;
 
+typedef std::vector <RegularExpression*> RegularExpressionPtrVector;
+
 class TagSearch : public DatabaseSearch {
 protected:
 	MSTagParameters& tagParams;
@@ -321,6 +323,10 @@ protected:
 	unsigned int compMask;
 	bool compMaskTypeAnd;
 	bool compMaskTypeOr;
+	RegularExpressionPtrVector regExp;
+	IntVectorVector regExpSites;
+	bool rexpFlag;
+	ModificationTable* modTable;
 	void addTagHit ( int searchNumber, const TagMatchVector& tagMatch, const std::string& sequence, const FrameIterator& fi, int previousAA, int nextAA, int startAA );
 	virtual void tag_search ( const FrameIterator& fi, const char* frame ) = 0;
 	void printParamsBodyHTML ( std::ostream& os ) const;

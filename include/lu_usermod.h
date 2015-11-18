@@ -44,6 +44,7 @@ class Usermod {
 
 	static bool initialised;
 	static bool productFlag;
+	static SetString glycoMods;
 
 	std::string outputString;
 	std::string formulaStr;
@@ -67,6 +68,7 @@ public:
 	unsigned int getMask () const { return mask; }
 	char getTerminalSpecificity () const { return terminalSpecificity; }
 	std::string getAAList () const { return aaList; }
+	static bool isGlyco ( const std::string& name );
 	static StringVector getNames ()
 	{
 		if ( initialised == false ) initialiseUsermod ();
@@ -243,12 +245,16 @@ class ExtraUserModInfo {
 	std::string formula;
 	std::string userAMass;
 	std::string limit;
+	std::string motifOffset;
+	std::string motif;
 public:
 	ExtraUserModInfo ();
-	ExtraUserModInfo ( const std::string& formula, const std::string& userAMass, const std::string& limit );
+	ExtraUserModInfo ( const std::string& formula, const std::string& userAMass, const std::string& limit, const std::string& motifOffset, const std::string& motif );
 	std::string getFormula () const { return formula; }
 	std::string getUserAMass () const { return userAMass; }
 	std::string getLimit () const { return limit; }
+	std::string getMotifOffset () const { return motifOffset; }
+	std::string getMotif () const { return motif; }
 };
 
 typedef std::map <PairStringString, ExtraUserModInfo> MapPairStringStringExtraUserModInfo;

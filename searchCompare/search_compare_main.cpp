@@ -103,6 +103,7 @@ int main ( int argc, char** argv )
 		sresFPR = params.getReportType () == "False Positive Rate";
 		sresTime = params.getReportType () == "Time" || sresFPR;
 		sresXLinks = params.getReportType () == "Crosslinked Peptides";
+		sresMods = params.getReportType () == "Modifications";
 		sresProt = params.getReportType () == "Protein";
 		sresKeepReplicates = params.getPeptideFilter () == "Keep Replicates" || sresTime;
 		sresKeepCharges = params.getPeptideFilter () == "Best Per Charge";
@@ -125,7 +126,8 @@ static void getSearchResults ( const SearchCompareParams& params, vector <Search
 {
 	sresSingleProject = true;
 	sresMainAndSupplementary = ( params.getSaveFormat () != 'P'  && params.getSaveFormat () != 'B' );
-	sresMergedFlag = params.getMergeOption () == "Merged";
+	sresMergedFlag = params.getMergeOption () == "Merged" && params.getReportType () != "Modifications";
+	sresModsMergedFlag = params.getMergeOption () == "Merged" && params.getReportType () == "Modifications";
 	string proj;
 	StringVector filenames = params.getFilenames ();
 #ifdef MYSQL_DATABASE
@@ -206,7 +208,7 @@ static void writeReport ( const SearchCompareParams& params, const vector <Searc
 					srr.push_back ( new SearchResultsProteinReport ( searchResults, remove, params.getAccessionNumbers (), params.getReportHitsType (), reportHomologousProteins, idUsedList [i] ) );
 				}
 			}
-			else if ( reportType == "Peptide" || sresXLinks ) {
+			else if ( reportType == "Peptide" || reportType == "Modifications" || sresXLinks ) {
 				srr.push_back ( new SearchResultsPeptideReport ( searchResults, remove, params.getAccessionNumbers (), params.getSortType (), params.getSortType2 (), params.getReportHitsType (), reportHomologousProteins, idUsedList [i] ) );
 			}
 			else if ( sresTime ) {

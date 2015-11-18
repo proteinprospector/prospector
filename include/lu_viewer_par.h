@@ -64,6 +64,8 @@ public:
 	void printHTML ( std::ostream& os ) const;
 };
 
+class UpdatingJavascriptMessage;
+
 class MSViewerParameters : public MSProgramParameters {
 	const ParameterList* pList;
 	bool pListFlag;
@@ -114,9 +116,9 @@ class MSViewerParameters : public MSProgramParameters {
 	static int getColumnNumber ( const std::string& name );
 	static std::string getColumnSeparator ( const std::string& name );
 	void init ( const ParameterList* params );
-	void scriptConversion ();
-	void initPeakList ( const ParameterList* params );
-	void initResults ( const ParameterList* params );
+	void scriptConversion ( UpdatingJavascriptMessage& ujm );
+	void initPeakList ( const ParameterList* params, UpdatingJavascriptMessage& ujm );
+	void initResults ( const ParameterList* params, UpdatingJavascriptMessage& ujm );
 	void initParams ( const ParameterList* params );
 public:
 	MSViewerParameters ( const ParameterList* params );
@@ -222,7 +224,7 @@ public:
 	bool getCommandLine () const { return commandLine; }
 	int getNumPepXML () const { return numPepXML; }
 	int getNumMSF () const { return numMSF; }
-	void processAPLFiles ();
+	void processAPLFiles ( UpdatingJavascriptMessage& ujm );
 };
 
 #endif /* ! __lu_viewer_par_h */

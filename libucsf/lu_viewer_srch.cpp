@@ -423,7 +423,6 @@ MSViewerSearch::MSViewerSearch ( const MSViewerParameters& params ) :
 	viewerParams ( params ),
 	ppSpectrumColumnNumber ( 0 )
 {
-	init_html ( cout, "MS-Viewer Report" );
 	if ( viewerParams.getSaveSettings () ) {
 		viewerParams.saveDataSet ();
 	}
@@ -656,11 +655,11 @@ void MSViewerSearch::processResultsFile ()
 	}
 	for ( int b = 0 ; b < numHeaderLines ; b++ ) {
 		genUniversalGetLine ( istr, line );
-		headerLines.push_back ( getColumns ( line, separator ) );
+		headerLines.push_back ( genColumnsFromLine ( line, separator ) );
 	}
 	int maxCols = 0;
 	while ( genUniversalGetLine ( istr, line ) ) {
-		rows.push_back ( getColumns ( line, separator ) );
+		rows.push_back ( genColumnsFromLine ( line, separator ) );
 		maxCols = genMax ( maxCols, (int)rows.back ().size () );
 	}
 	istr.close ();
@@ -1284,45 +1283,6 @@ void MSViewerSearch::processPeakListFile ()
 		else
 			throw runtime_error ( err );
 	}
-}
-StringVector MSViewerSearch::getColumns ( const string& line, const string& separator )
-{
-	StringVector cols;
-	string::size_type start = 0;
-	string::size_type end = 0;
-	bool append = false;
-	string s2;
-	for ( ; ; ) {
-		end = line.find_first_of ( separator, start );
-		string s = line.substr ( start, end-start );
-		start = end + 1;
-		if ( end != string::npos || !s.empty () ) {
-			if ( s [0] == '"' ) {
-				if ( end == string::npos ) { // deals with comma at end of field in inverted commas at line end
-					cols.push_back ( gen_strtrim2 ( s2 + "," ) );
-				}
-				else {
-					s2 = s.substr ( 1 );
-					append = true;
-					if ( !s2.empty () && s2 [s2.length () - 1] == '"' ) {
-						cols.push_back ( gen_strtrim2 ( s2.substr ( 0, s2.length () - 1 ) ) );
-						append = false;
-					}
-				}
-			}
-			else if ( append ) {
-				s2 += ',' + s;
-				if ( s2 [s2.length () - 1] == '"' ) {
-					cols.push_back ( gen_strtrim2 ( s2.substr ( 0, s2.length () - 1 ) ) );
-					append = false;
-				}
-			}
-			else
-				cols.push_back ( gen_strtrim2 ( s ) );
-		}
-		if ( end == string::npos ) break;
-	}
-	return cols;
 }
 void MSViewerSearch::printBodyHTML ( ostream& os )
 {

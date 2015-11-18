@@ -524,3 +524,42 @@ string genRandomString ( int len )
 	}
 	return s;
 }
+StringVector genColumnsFromLine ( const string& line, const string& separator )
+{
+	StringVector cols;
+	string::size_type start = 0;
+	string::size_type end = 0;
+	bool append = false;
+	string s2;
+	for ( ; ; ) {
+		end = line.find_first_of ( separator, start );
+		string s = line.substr ( start, end-start );
+		start = end + 1;
+		if ( end != string::npos || !s.empty () ) {
+			if ( s [0] == '"' ) {
+				if ( end == string::npos ) { // deals with comma at end of field in inverted commas at line end
+					cols.push_back ( gen_strtrim2 ( s2 + "," ) );
+				}
+				else {
+					s2 = s.substr ( 1 );
+					append = true;
+					if ( !s2.empty () && s2 [s2.length () - 1] == '"' ) {
+						cols.push_back ( gen_strtrim2 ( s2.substr ( 0, s2.length () - 1 ) ) );
+						append = false;
+					}
+				}
+			}
+			else if ( append ) {
+				s2 += ',' + s;
+				if ( s2 [s2.length () - 1] == '"' ) {
+					cols.push_back ( gen_strtrim2 ( s2.substr ( 0, s2.length () - 1 ) ) );
+					append = false;
+				}
+			}
+			else
+				cols.push_back ( gen_strtrim2 ( s ) );
+		}
+		if ( end == string::npos ) break;
+	}
+	return cols;
+}

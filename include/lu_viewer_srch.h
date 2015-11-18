@@ -105,7 +105,6 @@ class MSViewerSearch : public MSProgram {
 public:
 	MSViewerSearch ( const MSViewerParameters& params );
 	~MSViewerSearch ();
-	StringVector getColumns ( const std::string& line, const std::string& separator );
 	void printBodyHTML ( std::ostream& os );
 	void printSaveSettingsHTML ( std::ostream& os );
 	void printMSViewerRepositoryHMTL ( std::ostream& os );

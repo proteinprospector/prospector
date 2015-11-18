@@ -52,8 +52,8 @@ const char* FormItemSCFormat::options2 [] = {	"HTML",
 												"BiblioSpec",
 												"BiblioSpec (Normalized RT)", 0 };
 const char* FormItemSCReportType::optionsCal []		= { "Calibration", 0 };
-const char* FormItemSCReportType::optionsNormal []	= { "Protein", "Peptide", "Time", "False Positive Rate", 0 };
-const char* FormItemSCReportType::optionsXLink []	= { "Protein", "Peptide", "Time", "Crosslinked Peptides", "False Positive Rate", 0 };
+const char* FormItemSCReportType::optionsNormal []	= { "Protein", "Peptide", "Modifications", "Time", "False Positive Rate", 0 };
+const char* FormItemSCReportType::optionsXLink []	= { "Protein", "Peptide", "Modifications", "Time", "Crosslinked Peptides", "False Positive Rate", 0 };
 
 FormItemSCReportType::FormItemSCReportType ( bool cal, bool xlink, const string& type ) :
 	FormItemSelect ( "Report Type", "", getName (), getOptions ( cal, xlink ), getSelect ( cal, xlink, type ) )
@@ -131,13 +131,16 @@ static string REPORT_START_AA			= "report_start_aa";
 static string REPORT_END_AA				= "report_end_aa";
 static string REPORT_PREVIOUS_AA		= "report_previous_aa";
 static string REPORT_NEXT_AA			= "report_next_aa";
+static string REPORT_ELEM_COMP			= "report_elem_comp";
 static string REPORT_MISSED_CLEAVAGES	= "report_missed_cleavages";
 static string REPORT_MASS_MOD			= "report_mass_mod";
 static string REPORT_TIME				= "report_time";
 static string REPORT_NUMBER				= "report_number";
 static string REPORT_ACCESSION			= "report_accession";
+static string REPORT_INDEX				= "report_index";
 static string REPORT_UNIPROT_ID			= "report_uniprot_id";
 static string REPORT_GENE_NAME			= "report_gene_name";
+static string REPORT_VERSION			= "report_version";
 static string REPORT_PROT_LEN			= "report_prot_len";
 static string REPORT_MW					= "report_mw";
 static string REPORT_PI					= "report_pi";
@@ -318,11 +321,14 @@ void SearchCompareForm::createItems ()
 	formItemMap [REPORT_END_AA]			= new FormItemCheckbox ( "End AA", "", REPORT_END_AA, false );
 	formItemMap [REPORT_PREVIOUS_AA]	= new FormItemText ( "Previous AA", "", REPORT_PREVIOUS_AA, 1, 1, "0", fvj.addPositiveIntegerValidator ( REPORT_PREVIOUS_AA, "Previous AA" ) );
 	formItemMap [REPORT_NEXT_AA]		= new FormItemText ( "Next AA", "", REPORT_NEXT_AA, 1, 1, "0", fvj.addPositiveIntegerValidator ( REPORT_NEXT_AA, "Next AA" ) );
+	formItemMap [REPORT_ELEM_COMP]		= new FormItemCheckbox ( "Elem Comp", "", REPORT_ELEM_COMP, false );
 
 	formItemMap [REPORT_NUMBER]		= new FormItemCheckbox ( "Number", "", REPORT_NUMBER, true );
 	formItemMap [REPORT_ACCESSION]	= new FormItemCheckbox ( "Accession", "", REPORT_ACCESSION, true );
+	formItemMap [REPORT_INDEX]		= new FormItemCheckbox ( "Index", "", REPORT_INDEX, false );
 	formItemMap [REPORT_UNIPROT_ID]	= new FormItemCheckbox ( "Uniprot ID", "", REPORT_UNIPROT_ID, false );
 	formItemMap [REPORT_GENE_NAME]	= new FormItemCheckbox ( "Gene Name", "", REPORT_GENE_NAME, false );
+	formItemMap [REPORT_VERSION]	= new FormItemCheckbox ( "Version", "", REPORT_VERSION, false );
 	formItemMap [REPORT_PROT_LEN]	= new FormItemCheckbox ( "Protein Length", "", REPORT_PROT_LEN, false );
 	formItemMap [REPORT_MW]			= new FormItemCheckbox ( "MW", "", REPORT_MW, true );
 	formItemMap [REPORT_PI]			= new FormItemCheckbox ( "pI", "", REPORT_PI, false );
@@ -530,11 +536,14 @@ void SearchCompareForm::setValues ( const VectorConstParameterListPtr& params )
 		formItemMap [REPORT_END_AA]->setValue ( p );
 		formItemMap [REPORT_PREVIOUS_AA]->setValue ( p );
 		formItemMap [REPORT_NEXT_AA]->setValue ( p );
+		formItemMap [REPORT_ELEM_COMP]->setValue ( p );
 
 		formItemMap [REPORT_NUMBER]->setValue ( p );
 		formItemMap [REPORT_ACCESSION]->setValue ( p );
+		formItemMap [REPORT_INDEX]->setValue ( p );
 		formItemMap [REPORT_UNIPROT_ID]->setValue ( p );
 		formItemMap [REPORT_GENE_NAME]->setValue ( p );
+		formItemMap [REPORT_VERSION]->setValue ( p );
 		formItemMap [REPORT_PROT_LEN]->setValue ( p );
 		formItemMap [REPORT_MW]->setValue ( p );
 		formItemMap [REPORT_PI]->setValue ( p );
@@ -792,6 +801,10 @@ void SearchCompareForm::printHTML ( ostream& os )
 				formItemMap [REPORT_PROTEIN_MOD]->printHTML ( os );
 				formItemMap [SLIP_THRESHOLD]->printHTML ( os );
 				formItemMap [REPORT_MASS_MOD]->printHTML ( os );
+				formItemMap [REPORT_LINKS]->printHTML ( os );
+				if ( numSearches == 1 ) {
+					formItemMap [FormItemSCCheckboxes::getName ()]->printHTML ( os );
+				}
 				os << "<br />" << endl;
 				formItemMap [REPORT_MISSED_CLEAVAGES]->printHTML ( os );
 				formItemMap [REPORT_TIME]->printHTML ( os );
@@ -802,20 +815,19 @@ void SearchCompareForm::printHTML ( ostream& os )
 				formItemMap [REPORT_END_AA]->printHTML ( os );
 				formItemMap [REPORT_PREVIOUS_AA]->printHTML ( os );
 				formItemMap [REPORT_NEXT_AA]->printHTML ( os );
+				formItemMap [REPORT_ELEM_COMP]->printHTML ( os );
 				os << "<br />" << endl;
 				formItemMap [REPORT_NUMBER]->printHTML ( os );
 				formItemMap [REPORT_ACCESSION]->printHTML ( os );
+				formItemMap [REPORT_INDEX]->printHTML ( os );
 				formItemMap [REPORT_UNIPROT_ID]->printHTML ( os );
 				formItemMap [REPORT_GENE_NAME]->printHTML ( os );
+				formItemMap [REPORT_VERSION]->printHTML ( os );
 				formItemMap [REPORT_PROT_LEN]->printHTML ( os );
 				formItemMap [REPORT_MW]->printHTML ( os );
 				formItemMap [REPORT_PI]->printHTML ( os );
 				formItemMap [REPORT_SPECIES]->printHTML ( os );
 				formItemMap [REPORT_NAME]->printHTML ( os );
-				formItemMap [REPORT_LINKS]->printHTML ( os );
-				if ( numSearches == 1 ) {
-					formItemMap [FormItemSCCheckboxes::getName ()]->printHTML ( os );
-				}
 			tableHeaderEnd ( os );
 		tableRowEnd ( os );
 

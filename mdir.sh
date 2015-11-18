@@ -15,6 +15,7 @@ mkdir libraw
 mkdir libsqlite
 mkdir libucsf
 mkdir libzip
+mkdir makeParamDB
 mkdir msbatch
 mkdir msdisplay
 mkdir msform

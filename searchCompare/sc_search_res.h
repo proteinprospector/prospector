@@ -49,6 +49,8 @@ class ProteinInfo {
 	static bool reportUniprotID;
 	static bool reportGeneName;
 	static bool reportAccession;
+	static bool reportVersion;
+	static bool reportIndex;
 	static bool reportLength;
 	static bool reportMW;
 	static bool reportPI;
@@ -130,6 +132,8 @@ public:
 	static void setReportUniprotID ( bool f ) { reportUniprotID = f; }
 	static void setReportGeneName ( bool f ) { reportGeneName = f; }
 	static void setReportAccession ( bool f ) { reportAccession = f; }
+	static void setReportVersion ( bool f ) { reportVersion = f; }
+	static void setReportIndex ( bool f ) { reportIndex = f; }
 	static void setReportLength ( bool f ) { reportLength = f; }
 	static void setReportMW ( bool f ) { reportMW = f; }
 	static void setReportPI ( bool f ) { reportPI = f; }
@@ -138,9 +142,11 @@ public:
 	static void setReportLinks ( bool f ) { reportLinks = f; }
 	static bool getReport ()
 	{
-		return reportGeneName || reportUniprotID || reportAccession || reportLength || reportMW || reportPI || reportSpecies || reportName;
+		return reportGeneName || reportUniprotID || reportAccession || reportVersion || reportIndex || reportLength || reportMW || reportPI || reportSpecies || reportName;
 	}
 	static bool getReportAccession () { return reportAccession;	}
+	static bool getReportVersion () { return reportVersion;	}
+	static bool getReportIndex () { return reportIndex;	}
 	static bool getReportUniprotID () { return reportUniprotID; }
 	static bool getReportGeneName () { return reportGeneName; }
 	static void setTaxonomyMatch ( const StringVector& preferredSpecies );
@@ -232,6 +238,9 @@ public:
 		return nTerm + '-' + peptide + '-' + cTerm + '+' + neutralLoss;
 	}
 };
+
+class SiteScores;
+
 class PeptidePosition {
 	std::string accessionNumber;
 	const HitPeptide* hitPeptide;
@@ -284,6 +293,7 @@ class PeptidePosition {
 	static bool reportEndAA;
 	static int reportPreviousAA;
 	static int reportNextAA;
+	static bool reportElemComp;
 	static bool reportMissedCleavages;
 	static bool reportLength;
 	static bool reportComposition;
@@ -358,6 +368,7 @@ public:
 	std::string getPrintedSequence () const;
 	int getNumTolTerm ( const ProteinInfo& proteinInfo ) const;
 	std::string getMissedCleavages () const;
+	std::string getElemComp () const;
 	double getMOverZ () const { return mmsi->getMOverZ (); }
 	int getCharge () const { return mmsi->getCharge (); }
 	int getMaxFragmentCharge ( int searchNumber ) const
@@ -429,6 +440,7 @@ public:
 	static void setReportEndAA		( bool f )	{ reportEndAA = f; }
 	static void setReportPreviousAA	( int num )	{ reportPreviousAA = num; }
 	static void setReportNextAA		( int num )	{ reportNextAA = num; }
+	static void setReportElemComp	( bool f )	{ reportElemComp = f; }
 	static void setReportMissedCleavages( bool f )	{ reportMissedCleavages = f; }
 	static void setReportLength		( bool f )	{ reportLength = f; }
 	static void setReportComposition( bool f )	{ reportComposition = f; }
@@ -457,6 +469,7 @@ public:
 	static int getReportPreviousAA () { return reportPreviousAA; }
 	static bool getReportDBPeptide () { return reportDBPeptide; }
 	static int getReportNextAA () { return reportNextAA; }
+	static bool getReportElemComp () { return reportElemComp; }
 
 	static const double INVALID_ERROR;
 	static const ParameterList* getParams0 ()		{ return params [0]; }
@@ -474,6 +487,8 @@ public:
 	static double getRTIntervalEnd () { return rtIntervalEnd; }
 	static std::string getSysErrorStr ( int i ) { return sysErrorStr [i]; }
 	void runMSProduct ( int i, double score ) const;
+	void addSiteScores ( SiteScores& siteScores, int line ) const;
+	static void initialiseAACalculator ( const MapStringConstModPtr& constMods );
 };
 typedef std::vector <PeptidePosition> PeptidePositionVector;
 typedef PeptidePositionVector::size_type PeptidePositionVectorSizeType;
@@ -486,12 +501,14 @@ typedef PeptidePositionVector::size_type PeptidePositionVectorSizeType;
 SEARCH_RES_EXTERN bool sresProt;
 SEARCH_RES_EXTERN bool sresTime;
 SEARCH_RES_EXTERN bool sresXLinks;
+SEARCH_RES_EXTERN bool sresMods;
 SEARCH_RES_EXTERN bool sresFPR;
 SEARCH_RES_EXTERN bool sresKeepReplicates;
 SEARCH_RES_EXTERN bool sresKeepCharges;
 SEARCH_RES_EXTERN bool sresKeepTimeReplicates;
 SEARCH_RES_EXTERN bool sresSingleProject;
 SEARCH_RES_EXTERN bool sresMergedFlag;
+SEARCH_RES_EXTERN bool sresModsMergedFlag;
 SEARCH_RES_EXTERN bool sresMainAndSupplementary;
 SEARCH_RES_EXTERN UpdatingJavascriptMessage* ujm;
 SEARCH_RES_EXTERN bool sresViewer;
@@ -521,6 +538,7 @@ public:
 	virtual void printHTML ( std::ostream& os, bool empty, const std::string& styleID ) const;
 	virtual void printHeaderDelimited ( std::ostream& os, int index ) const;
 	virtual void printDelimited ( std::ostream& os ) const;
+	virtual void printDelimitedEmpty ( std::ostream& os ) const;
 	double getScore () const { return score; }
 	double getBestScore () const { return bestScore; }
 	int getNumUnique () const { return numUnique; }
@@ -661,6 +679,7 @@ public:
 	void printHTMLPeak2 ( std::ostream& os, int searchNumber, const std::string& styleID, const SCMSTagLink& smtl, bool joint ) const;
 	void printDelimited ( std::ostream& os, const ProteinInfo& proteinInfo, int searchNumber ) const;
 	static void printDelimitedEmpty ( std::ostream& os, int searchNumber );
+	static void printHTMLEmpty ( std::ostream& os, int searchNumber, const std::string& styleID );
 	const PPPeptideHitInfo* getPeptideHitInfo () const { return &peptideHitInfo; }
 	double getScore () const { return peptideHitInfo.getScore (); }
 	double getScoreDifference () const { return peptideHitInfo.getScoreDifference (); }
@@ -723,6 +742,7 @@ public:
 	int getFraction () const { return peptidePosition.getFraction (); }
 	std::string getMSMSInfo () const { return peptidePosition.getMSMSInfo (); }
 	bool getFirstOccurence () const { return peptidePosition.getFirstOccurence (); }
+	void addSiteScores ( SiteScores& siteScores, int line ) const;
 };
 typedef std::vector <SearchResultsPeptideHit*> SearchResultsPeptideHitPtrVector;
 typedef SearchResultsPeptideHitPtrVector::const_iterator SearchResultsPeptideHitPtrVectorConstIterator;
@@ -965,6 +985,7 @@ public:
 	void printHTML ( std::ostream& os, bool empty, const std::string& styleID ) const;
 	void printHeaderDelimited ( std::ostream& os, int index ) const;
 	void printDelimited ( std::ostream& os ) const;
+	void printDelimitedEmpty ( std::ostream& os ) const;
 };
 
 typedef std::map <std::string, std::pair<std::pair<double,double>, std::string> > MapSpecIDBestDiscriminantScore;

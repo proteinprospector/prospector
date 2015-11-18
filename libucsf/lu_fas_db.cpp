@@ -20,9 +20,6 @@
 *  All rights reserved.                                                       *
 *                                                                             *
 ******************************************************************************/
-#ifdef VIS_C
-#pragma warning( disable : 4503 )	// Disable warnings about decorated name length being too long
-#endif
 #ifndef VIS_C
 #include <stdexcept>
 #endif
@@ -261,6 +258,8 @@ FastaServer::FastaServer ( const string& filename, bool createIndicies )
 {
 	if ( filename.find ( "UserProtein" ) != string::npos )
 		openUserDatabase ( filename, createIndicies );
+	else if ( isNoCaseSuffix ( SeqdbDir::instance ().getDatabasePath ( filename ), ".peff" ) )
+		openPEFFDatabase ( filename, createIndicies );
 	else
 		openDatabase ( filename, createIndicies );
 	random	= ( usedFileName.find ( ".random" ) != string::npos );
@@ -281,6 +280,20 @@ void FastaServer::openUserDatabase ( const string& filename, bool createIndicies
 	numEntries = dbIndicies->getNumEntries ();
 
 	commentLine = getCommentLine ( usedFileName, dbIndicies );
+
+	sequenceReader = getSequenceReader ( usedFileName, dbIndicies );
+
+	cur = -1;
+}
+void FastaServer::openPEFFDatabase ( const string& filename, bool createIndicies )
+{
+	dna_database = false;
+	usedFileName = filename;
+
+	dbIndicies = new DatabaseIndicies ( filename + ".peff", createIndicies );
+	numEntries = dbIndicies->getNumEntries ();
+
+	commentLine = new DefaultCommentLine ( dbIndicies );
 
 	sequenceReader = getSequenceReader ( usedFileName, dbIndicies );
 

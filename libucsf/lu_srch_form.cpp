@@ -1166,7 +1166,23 @@ FormItemSpecificity::FormItemSpecificity ( const string& n, int num ) :
 	FormItemSelect ( "Specificity", "", getName ( n, num ), modOptions, modOptions [0] )
 {
 }
-const char* FormItemLimit::limitOptions [] = {	"Common", "Rare", 0 };
+const char* FormItemModFile::modFileOptions [] = {	"All", "Protein", "Peptide", "Site", 0 };
+
+FormItemModFile::FormItemModFile () :
+	FormItemSelect ( "", "", getName (), modFileOptions, modFileOptions [0] )
+{
+}
+const char* FormItemMotifOffset::offsetOptions [] = { "Off", "0", "-1", "+1", "-2", "+2", "-3", "+3", 0 };
+
+FormItemMotifOffset::FormItemMotifOffset ( const string& n, int num ) :
+	FormItemSelect ( "Motif", "", getName ( n, num ), offsetOptions, offsetOptions [0] )
+{
+}
+FormItemMotif::FormItemMotif ( FormValidatingJavascript* fvj, const string& n, int num ) :
+	FormItemText ( "", "", getName ( n, num ), 10, 20, "N[^P][ST]", fvj->addMSPatternValidator ( getName ( n, num ), "Motif" ) )
+{
+}
+const char* FormItemLimit::limitOptions [] = { "Common", "Rare", "Label 1", "Label 2", "Label 3", 0 };
 
 FormItemLimit::FormItemLimit ( const string& n, int num ) :
 	FormItemSelect ( "", "", getName ( n, num ), limitOptions, limitOptions [0] )
@@ -1177,6 +1193,9 @@ void FormItemLimit::setOptions ( const ParameterList* p, const string& n )
 	StringVector sv;
 	sv.push_back ( "Common" );
 	sv.push_back ( "Rare" );
+	sv.push_back ( "Label 1" );
+	sv.push_back ( "Label 2" );
+	sv.push_back ( "Label 3" );
 	int maxMods = p->getIntValue ( n );
 	for ( int i = 1 ; i < maxMods ; i++ ) {
 		sv.push_back ( "Max " + gen_itoa (i) );
@@ -1689,6 +1708,38 @@ public:
 	static string getName () { return "mod_neutral_loss"; }
 };
 
+class FormItemModRare : public FormItemCheckbox {
+public:
+	FormItemModRare () :
+		FormItemCheckbox ( "Rare", "", getName (), false ) {}
+	static string getName () { return "mod_rare"; }
+};
+
+class FormItemModMotifAA : public FormItemSelect {
+	static const char* options [];
+public:
+	FormItemModMotifAA ( int num, const string& aa ) :
+		FormItemSelect ( "Motif " + gen_itoa ( num ), "", getName (num), options, aa ) {}
+	static string getName ( int num ) { return "mod_motif_aa_" + gen_itoa ( num ); }
+};
+const char* FormItemModMotifAA::options [] = { "A","C","D","E","F","G","H","I","K","L","M","N","P","Q","R","S","T","V","W","Y",0 };
+
+class FormItemModMotifOffset : public FormItemSelect {
+	static const char* options [];
+public:
+	FormItemModMotifOffset ( int num ) :
+		FormItemSelect ( "Motif", "", getName (num), options, options [0] ) {}
+	static string getName ( int num ) { return "mod_motif_offset_" + gen_itoa ( num ); }
+};
+const char* FormItemModMotifOffset::options [] = { "Off", "0", "-1", "+1", "-2", "+2", "-3", "+3", 0 };
+
+class FormItemModMotif : public FormItemText {
+public:
+	FormItemModMotif ( int num, const string& defaultRegExp, FormValidatingJavascript* fvj ) :
+		FormItemText ( "", "", getName (num), 10, 10, defaultRegExp, fvj->addMSPatternValidator ( getName (num), "Mass Mod Motif " + gen_itoa ( num ) ) ) {}
+	static string getName ( int num ) { return "mod_motif_" + gen_itoa ( num ); }
+};
+
 namespace {				// MS-Bridge setting form
 void printSetBridgeLinkSearchDefaults ( ostream& os )
 {
@@ -1707,7 +1758,7 @@ void printSetBridgeLinkSearchDefaults ( ostream& os )
 			if ( linkNames [i] != "User Defined Link" ) {
 				StringVector uMods = LinkInfo::getUsermods ( i );
 				for ( StringVectorSizeType k = 0 ; k < uMods.size () ; k++ ) {
-					os << "\t\t\t" << "addSelectOption ( \"mod_AA\", '" << uMods [k] << "', '' );" << endl;
+					os << "\t\t\t" << "addSelectOption ( \"mod_AA\", '" << uMods [k] << "', '', '', '', '' );" << endl;
 				}
 			}
 			os << "\t\t" << "}" << endl;
@@ -1833,7 +1884,7 @@ void printSetLinkSearchDefaults ( ostream& os, int n )
 				printSetMassModOptions ( os, LinkInfo::getLinkAAs ( i ), "\t\t\t" );
 				StringVector uMods = LinkInfo::getUsermods ( i );
 				for ( StringVectorSizeType k = 0 ; k < uMods.size () ; k++ ) {
-					os << "\t\t\t" << "addSelectOption ( \"msms_mod_AA\", '" << uMods [k] << "', 'Common' );" << endl;
+					os << "\t\t\t" << "addSelectOption ( \"msms_mod_AA\", '" << uMods [k] << "', 'Common', 'All', 'Off', '' );" << endl;
 					//os << "\t\t\t" << "multiSelectSet(form.msms_mod_AA" << ", '" << uMods [k] << "', true);" << endl;
 				}
 			}
@@ -1894,6 +1945,7 @@ void massModCrosslinkingJavascriptFunctions ( ostream& os, int n )
 
 	endJavascript ( os );
 }
+const int MassModificationForm::numMotifs = 2;
 MassModificationForm::MassModificationForm ( const VectorConstParameterListPtr& params, FormValidatingJavascript* fvj ) :
 	compIonForm ( params, "ACDEFGHIKLMNPQRSTVWY", "mod_" ),
 	fvj ( fvj )
@@ -1916,6 +1968,12 @@ void MassModificationForm::setValues ( const VectorConstParameterListPtr& params
 		formItemMap [FormItemModCTermType::getName ()]->setValue ( p );
 		formItemMap [FormItemModCTerm::getName ()]->setValue ( p );
 		formItemMap [FormItemModNeutralLoss::getName ()]->setValue ( p );
+		formItemMap [FormItemModRare::getName ()]->setValue ( p );
+		for ( int i = 1 ; i <= numMotifs ; i++ ) {
+			formItemMap [FormItemModMotifAA::getName (i)]->setValue ( p );
+			formItemMap [FormItemModMotifOffset::getName (i)]->setValue ( p );
+			formItemMap [FormItemModMotif::getName (i)]->setValue ( p );
+		}
 	}
 }
 void MassModificationForm::createItems ()
@@ -1931,6 +1989,12 @@ void MassModificationForm::createItems ()
 	formItemMap [FormItemModCTermType::getName ()]		= new FormItemModCTermType ();
 	formItemMap [FormItemModCTerm::getName ()]			= new FormItemModCTerm ();
 	formItemMap [FormItemModNeutralLoss::getName ()]	= new FormItemModNeutralLoss ();
+	formItemMap [FormItemModRare::getName ()]			= new FormItemModRare ();
+	for ( int i = 1 ; i <= numMotifs ; i++ ) {
+		formItemMap [FormItemModMotifAA::getName (i)]		= new FormItemModMotifAA ( i, i == 1 ? "N" : "S" );
+		formItemMap [FormItemModMotifOffset::getName (i)]	= new FormItemModMotifOffset ( i );
+		formItemMap [FormItemModMotif::getName (i)]			= new FormItemModMotif ( i, i == 1 ? "N[^P][ST]" : ".", fvj );
+	}
 }
 void MassModificationForm::setMMVisualizationFlags ( const string& val, bool& div_mm_1, bool& div_mm_2, bool& div_mm_3, bool& div_mm_4 ) const
 {
@@ -2002,8 +2066,18 @@ void MassModificationForm::printHTML ( ostream& os )
 		tableRowStart ( os );
 			tableHeaderStart ( os, "", "left", true );
 				formItemMap [FormItemModNeutralLoss::getName ()]->printHTML ( os );
+				formItemMap [FormItemModRare::getName ()]->printHTML ( os );
 			tableHeaderEnd ( os );
 		tableRowEnd ( os );
+		for ( int i = 1 ; i <= numMotifs ; i++ ) {
+			tableRowStart ( os );
+				tableHeaderStart ( os, "", "left", true );
+					formItemMap [FormItemModMotifAA::getName (i)]->printHTML ( os );
+					formItemMap [FormItemModMotifOffset::getName (i)]->printHTML ( os );
+					formItemMap [FormItemModMotif::getName (i)]->printHTML ( os );
+				tableHeaderEnd ( os );
+			tableRowEnd ( os );
+		}
 	tableEnd ( os );
 	ejb.printFooter ( os );
 	showHiddenItems ( os );
@@ -2038,7 +2112,7 @@ protected:
 	void printRemoveOption ( ostream& os ) const;
 private:
 	FormItemSelect fis1;
-	FormItemSelect fis2;
+	FormItemSelectMultiple fis2;
 	virtual void printFunctions ( ostream& os ) const;
 	virtual void printAddOption ( ostream& os ) const;
 public:
@@ -2049,13 +2123,16 @@ public:
 
 class MSTagVariableModsSettingJavascript : public VariableModsSettingJavascript {
 	FormItemLimit fil;
+	//FormItemModFile fimf;
+	FormItemMotifOffset mf;
+	FormItemMotif motif;
 	virtual void printFunctions ( ostream& os ) const;
 	virtual void printAddOption ( ostream& os ) const;
 	void printRemoveMaxOptions ( ostream& os ) const;
 	void printAddMaxOptions ( ostream& os ) const;
 	void printSetMaxOptions ( ostream& os ) const;
 public:
-	MSTagVariableModsSettingJavascript ();
+	MSTagVariableModsSettingJavascript ( FormValidatingJavascript* fvj );
 	virtual void setValues ( const ParameterList* p );
 	virtual void printHTML ( ostream& os ) const;
 };
@@ -2065,16 +2142,23 @@ VariableModsSettingJavascript::VariableModsSettingJavascript ( const string& pre
 	typeOptions ( Usermod::getTypeOptions () ),
 	phosphoSTYMenuString ( Usermod::getPhosphoSTYMenuString () ),
 	fis1 ( "", "", prefix + "mod_AA_types", typeOptions, phosphoSTYMenuString, 1, "changeVariableModType (this.form)" ),
-	fis2 ( "", "", prefix + "mod_AA_list", Usermod::getNames (phosphoSTYMenuString), "Phospho (STY)" )
+	fis2 ( "", "", prefix + "mod_AA_list", Usermod::getNames (phosphoSTYMenuString), StringVector (), 4 )
 {
 }
 void VariableModsSettingJavascript::printHTML ( ostream& os ) const
 {
 	printFunctions ( os );
 	os << "Add (+) or remove (-) mods using menus & buttons below<br />" << endl;
-	fis1.printHTML ( os );
-	fis2.printHTML ( os );
-	os << "<br />" << endl;
+	tableStart ( os );
+		tableRowStart ( os );
+			tableHeaderStart ( os, "", "center", true );
+				fis1.printHTML ( os );
+			tableHeaderEnd ( os );
+			tableHeaderStart ( os, "", "center", true );
+				fis2.printHTML ( os );
+			tableHeaderEnd ( os );
+		tableRowEnd ( os );
+	tableEnd ( os );
 	os << "<input type=\"button\" value=\"+\" onclick=\"" << "addOption (this.form)\" />" << endl;
 	os << "<input type=\"button\" value=\"-\" onclick=\"" << "removeOption (this.form)\" />" << endl;
 }
@@ -2090,7 +2174,7 @@ void VariableModsSettingJavascript::printFunctions ( ostream& os ) const
 }
 void VariableModsSettingJavascript::printAddSelectOption ( ostream& os ) const
 {
-	os << "function addSelectOption" << " ( name, val1, val2 ) {" << endl;
+	os << "function addSelectOption" << " ( name, val1, val2, val3, val4, val5 ) {" << endl;
 	os << "\t" << "var x = document.getElementsByName(name) [0];" << endl;
 	os << "\t" << "var pos = x.length;" << endl;		// Default is to add at the end
 	os << "\t" << "for ( var i = 0; i < x.length ; i++ ) {" << endl;
@@ -2110,11 +2194,17 @@ void VariableModsSettingJavascript::printAddSelectOption ( ostream& os ) const
 	os << "\t\t" << "}" << endl;
 	os << "\t" << "}" << endl;
 	os << "\t" << "var op = document.createElement(\"option\");" << endl;
-	os << "\t" << "var val3 = val1;" << endl;
+	os << "\t" << "var v = val1;" << endl;
 	os << "\t" << "if ( val2 != \"Common\" && val2 != \"\" ) {" << endl;
-	os << "\t\t" << "val3 += \" - \" + val2;" << endl;
+	os << "\t\t" << "v += \" - \" + val2;" << endl;
 	os << "\t" << "}" << endl;
-	os << "\t" << "op.text = val3;" << endl;
+	os << "\t" << "if ( val3 != \"All\" && val3 != \"\" ) {" << endl;
+	os << "\t\t" << "v += \" - \" + val3;" << endl;
+	os << "\t" << "}" << endl;
+	os << "\t" << "if ( val4 != \"Off\" && val4 != \"\" && val5 != \"\" ) {" << endl;
+	os << "\t\t" << "v += \" - Motif \" + val4 + \" \" + val5;" << endl;
+	os << "\t" << "}" << endl;
+	os << "\t" << "op.text = v;" << endl;
 	os << "\t" << "x.add(op, pos);" << endl;
 	os << "\t" << "x.options [pos].selected = true;" << endl;
 	os << "}" << endl;
@@ -2161,21 +2251,32 @@ void VariableModsSettingJavascript::addSingleVariableModType ( ostream& os, cons
 void VariableModsSettingJavascript::printAddOption ( ostream& os ) const
 {
 	os << "function addOption" << " ( form ) {" << endl;
-	os << "\t" << "var val1 = getSelectValue(form." + prefix + "mod_AA_list);" << endl;
-	os << "\t" << "addSelectOption ( \"" + prefix + "mod_AA\", val1, \"\" );" << endl;
+	os << "\t" << "var x = document.getElementsByName(\"" + prefix + "mod_AA_list\") [0];" << endl;
+	os << "\t" << "for ( var i = 0; i < x.length ; i++ ) {" << endl;
+	os << "\t\t" << "if ( x.options [i].selected ) {" << endl;
+	os << "\t\t\t" << "addSelectOption ( \"" + prefix + "mod_AA\", x.options [i].text, \"\", \"\", \"\", \"\" );" << endl;
+	os << "\t\t" << "}" << endl;
+	os << "\t" << "}" << endl;
 	os << "}" << endl;
 }
 void VariableModsSettingJavascript::printRemoveOption ( ostream& os ) const
 {
 	os << "function removeOption" << " ( form ) {" << endl;
-	os << "\t" << "var val1 = getSelectValue(form." + prefix + "mod_AA_list);" << endl;
-	os << "\t" << "removeSelectOption ( \"" + prefix + "mod_AA\", val1 );" << endl;
+	os << "\t" << "var x = document.getElementsByName(\"" + prefix + "mod_AA_list\") [0];" << endl;
+	os << "\t" << "for ( var i = 0; i < x.length ; i++ ) {" << endl;
+	os << "\t\t" << "if ( x.options [i].selected ) {" << endl;
+	os << "\t\t\t" << "removeSelectOption ( \"" + prefix + "mod_AA\", x.options [i].text );" << endl;
+	os << "\t\t" << "}" << endl;
+	os << "\t" << "}" << endl;
 	os << "}" << endl;
 }
 
-MSTagVariableModsSettingJavascript::MSTagVariableModsSettingJavascript () :
+MSTagVariableModsSettingJavascript::MSTagVariableModsSettingJavascript ( FormValidatingJavascript* fvj ) :
 	VariableModsSettingJavascript ( "msms_" ),
-	fil ( "mod_AA", 1 )
+	fil ( "mod_AA", 1 ),
+	//fimf (),
+	mf (),
+	motif ( fvj )
 {
 }
 void MSTagVariableModsSettingJavascript::setValues ( const ParameterList* p )
@@ -2186,6 +2287,9 @@ void MSTagVariableModsSettingJavascript::printHTML ( ostream& os ) const
 {
 	VariableModsSettingJavascript::printHTML ( os );
 	fil.printHTML ( os );
+	//fimf.printHTML ( os );
+	mf.printHTML ( os );
+	motif.printHTML ( os );
 }
 void MSTagVariableModsSettingJavascript::printFunctions ( ostream& os ) const
 {
@@ -2203,9 +2307,16 @@ void MSTagVariableModsSettingJavascript::printFunctions ( ostream& os ) const
 void MSTagVariableModsSettingJavascript::printAddOption ( ostream& os ) const
 {
 	os << "function addOption" << " ( form ) {" << endl;
-	os << "\t" << "var val1 = getSelectValue(form." + prefix + "mod_AA_list);" << endl;
+	os << "\t" << "var x = document.getElementsByName(\"" + prefix + "mod_AA_list\") [0];" << endl;
 	os << "\t" << "var val2 = getSelectValue(form.mod_AA_limit);" << endl;
-	os << "\t" << "addSelectOption ( \"" + prefix + "mod_AA\", val1, val2 );" << endl;
+	os << "\t" << "var val3 = \"All\";" << endl;
+	os << "\t" << "var val4 = getSelectValue(form.motif_offset);" << endl;
+	os << "\t" << "var val5 = form.motif.value;" << endl;
+	os << "\t" << "for ( var i = 0; i < x.length ; i++ ) {" << endl;
+	os << "\t\t" << "if ( x.options [i].selected ) {" << endl;
+	os << "\t\t\t" << "addSelectOption ( \"" + prefix + "mod_AA\", x.options [i].text, val2, val3, val4, val5 );" << endl;
+	os << "\t\t" << "}" << endl;
+	os << "\t" << "}" << endl;
 	os << "}" << endl;
 }
 void MSTagVariableModsSettingJavascript::printRemoveMaxOptions ( ostream& os ) const
@@ -2249,7 +2360,7 @@ void MSTagVariableModsSettingJavascript::printSetMaxOptions ( ostream& os ) cons
 }
 VariableModsForm::VariableModsForm ( const VectorConstParameterListPtr& params, const string& prefix, FormValidatingJavascript* fvj ) :
 	prefix ( prefix ),
-	vmsj ( ( prefix == "msms_" ) ? new MSTagVariableModsSettingJavascript : new VariableModsSettingJavascript )
+	vmsj ( ( prefix == "msms_" ) ? new MSTagVariableModsSettingJavascript ( fvj ) : new VariableModsSettingJavascript )
 {
 	create ( params );
 }
@@ -2302,6 +2413,8 @@ void ExtraUserModsForm::setValues ( const VectorConstParameterListPtr& params )
 				formItemMap [FormItemAccurateMass::getName("mod_"+sNum, num)]->setValue ( p );
 				formItemMap [FormItemLimit::getName("mod_"+sNum, num)]->setOptions ( p, "msms_max_modifications" );
 				formItemMap [FormItemLimit::getName("mod_"+sNum, num)]->setValue ( p );
+				formItemMap [FormItemMotifOffset::getName("mod_"+sNum, num)]->setValue ( p );
+				formItemMap [FormItemMotif::getName("mod_"+sNum, num)]->setValue ( p );
 			}
 		}
 	}
@@ -2316,6 +2429,8 @@ void ExtraUserModsForm::createItems ()
 		if ( massItem ) {
 			formItemMap [FormItemAccurateMass::getName("mod_"+sNum, num)]= new FormItemAccurateMass ( "mod_"+sNum, num, fvj );
 			formItemMap [FormItemLimit::getName("mod_"+sNum, num)]= new FormItemLimit ( "mod_"+sNum, num );
+			formItemMap [FormItemMotifOffset::getName("mod_"+sNum, num)]= new FormItemMotifOffset ( "mod_"+sNum, num );
+			formItemMap [FormItemMotif::getName("mod_"+sNum, num)]= new FormItemMotif ( fvj, "mod_"+sNum, num );
 		}
 	}
 }
@@ -2327,15 +2442,18 @@ void ExtraUserModsForm::printHTML ( ostream& os )
 		string sNum = gen_itoa ( i );
 		formItemMap [FormItemLabel::getName("mod_"+sNum, num)]->printHTML ( os );
 		formItemMap [FormItemSpecificity::getName("mod_"+sNum, num)]->printHTML ( os );
-		if ( massItem ) {
-			formItemMap [FormItemLimit::getName("mod_"+sNum, num)]->printHTML ( os );
-			os << "<br />" << endl;
-		}
+		if ( massItem ) os << "<br />" << endl;
 		formItemMap [FormItemComposition::getName("mod_"+sNum, num)]->printHTML ( os );
 		if ( massItem ) {
 			formItemMap [FormItemAccurateMass::getName("mod_"+sNum, num)]->printHTML ( os );
 		}
 		os << "<br />" << endl;
+		if ( massItem ) {
+			formItemMap [FormItemLimit::getName("mod_"+sNum, num)]->printHTML ( os );
+			formItemMap [FormItemMotifOffset::getName("mod_"+sNum, num)]->printHTML ( os );
+			formItemMap [FormItemMotif::getName("mod_"+sNum, num)]->printHTML ( os );
+			os << "<br />" << endl;
+		}
 	}
 	ejb.printFooter ( os );
 	showHiddenItems ( os );
@@ -2350,6 +2468,8 @@ void ExtraUserModsForm::replaceSubstrings ( string& s ) const
 		if ( massItem ) {
 			s = genReplaceSubstrings ( s, FormItemAccurateMass::getName("mod_"+sNum, num),	FormItemAccurateMass::getName("mod_"+sNum, 1) );
 			s = genReplaceSubstrings ( s, FormItemLimit::getName("mod_"+sNum, num),			FormItemLimit::getName("mod_"+sNum, 1) );
+			s = genReplaceSubstrings ( s, FormItemMotifOffset::getName("mod_"+sNum, num),	FormItemMotifOffset::getName("mod_"+sNum, 1) );
+			s = genReplaceSubstrings ( s, FormItemMotif::getName("mod_"+sNum, num),			FormItemMotif::getName("mod_"+sNum, 1) );
 		}
 	}
 }

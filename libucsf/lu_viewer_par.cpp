@@ -155,6 +155,7 @@ MSViewerParameters::MSViewerParameters ( const ParameterList* params ) :
 	numPepXML ( 0 ),
 	numMSF ( 0 )
 {
+	init_html ( cout, "MS-Viewer Report" );
 	if ( !deleteFlag ) {
 		if ( !searchKey.empty () ) {	// A saved dataset
 			string f1 = getViewerRepositoryPath ( searchKey ) + SLASH + "params.xml";
@@ -225,17 +226,20 @@ string MSViewerParameters::getViewerRepositoryPath ( const string& searchKey )
 }
 void MSViewerParameters::init ( const ParameterList* params )
 {
+	UpdatingJavascriptMessage ujm;
 	resultsFileFormat = params->getStringValue ( "results_file_format" );
 	instrumentFilter = params->getStringValue ( "instrument_filter" );
 	probabilityLimit = params->getDoubleValue ( "probability_limit", 0.05 );
-	initResults ( params );
-	initPeakList ( params );
+	initResults ( params, ujm );
+	initPeakList ( params, ujm );
 	initParams ( params );
+	ujm.deletePreviousMessage ( cout );
 }
-void MSViewerParameters::initResults ( const ParameterList* params )
+void MSViewerParameters::initResults ( const ParameterList* params, UpdatingJavascriptMessage& ujm )
 {
 	resultsFpath = params->getStringValue ( "results_filepath" );
 	if ( resultsFpath.empty () ) {
+		ujm.writeMessage ( cout, "Starting process of results file." );
 		bool multi = false;
 		string uploadResultsFname;
 		string uploadResultsFpath;
@@ -312,7 +316,8 @@ void MSViewerParameters::initResults ( const ParameterList* params )
 		if ( !origPath.empty () ) {
 			genUnlinkDirectory ( origPath );
 		}
-		scriptConversion ();
+		scriptConversion ( ujm );
+		ujm.writeMessage ( cout, "Ending process of results file." );
 	}
 	else {
 		if ( genIsFullPath ( resultsFpath ) ) {
@@ -320,37 +325,42 @@ void MSViewerParameters::initResults ( const ParameterList* params )
 		}
 	}
 }
-void MSViewerParameters::scriptConversion ()
+void MSViewerParameters::scriptConversion ( UpdatingJavascriptMessage& ujm )
 {
 	bool prospector = getProspector ();
 	bool prospectorXL = getProspectorXL ();
 	bool other = getOther ();
 	bool automatic = getAuto ();
 	if ( !prospector && !prospectorXL && !other && !automatic ) {
-		bool maxQuant = getMaxQuant ();
-		string command = getSystemCall ( getScript () );
-		string resultsFpath2 = resultsFpath + "_1";
-		command += " ";
-		command += "\"" + resultsFpath +"\"";
-		command += " ";
-		command += "\"" + resultsFpath2 +"\"";
-		if ( maxQuant ) {
+		string script = getScript ();
+		if ( script != "N/A" ) {
+			ujm.writeMessage ( cout, "Starting script conversion of results file." );
+			bool maxQuant = getMaxQuant ();
+			string command = getSystemCall ( script );
+			string resultsFpath2 = resultsFpath + "_1";
 			command += " ";
-			command += "\"" + gen_ftoa ( probabilityLimit, "%.4f" ) +"\"";
-			if ( !instrumentFilter.empty () ) {
+			command += "\"" + resultsFpath +"\"";
+			command += " ";
+			command += "\"" + resultsFpath2 +"\"";
+			if ( maxQuant ) {
 				command += " ";
-				command += "\"" + instrumentFilter +"\"";
+				command += "\"" + gen_ftoa ( probabilityLimit, "%.4f" ) +"\"";
+				if ( !instrumentFilter.empty () ) {
+					command += " ";
+					command += "\"" + instrumentFilter +"\"";
+				}
 			}
+			int ret = genSystem ( command, "", true );
+			if ( ret != 0 ) {
+				ErrorHandler::genError ()->error ( "Problems converting the results file." );
+			}
+			ujm.writeMessage ( cout, "Ending script conversion of results file." );
+			genUnlink ( resultsFpath );
+			genRename ( resultsFpath2, resultsFpath );
 		}
-		int ret = genSystem ( command, "", true );
-		if ( ret != 0 ) {
-			ErrorHandler::genError ()->error ( "Problems converting the results file." );
-		}
-		genUnlink ( resultsFpath );
-		genRename ( resultsFpath2, resultsFpath );
 	}
 }
-void MSViewerParameters::initPeakList ( const ParameterList* params )
+void MSViewerParameters::initPeakList ( const ParameterList* params, UpdatingJavascriptMessage& ujm )
 {
 	peakListFpath = params->getStringValue ( "peak_list_filepath" );
 	if ( peakListFpath.empty () ) {
@@ -368,7 +378,9 @@ void MSViewerParameters::initPeakList ( const ParameterList* params )
 		if ( uploadPeakListFname.empty () ) {
 			return;
 		}
+		ujm.writeMessage ( cout, "Starting preprocessing of results file." );
 		string uploadName = genPreprocessFile ( uploadPeakListFpath );
+		ujm.writeMessage ( cout, "Ending preprocessing of results file." );
 		if ( uploadName == uploadPeakListFpath || isCompressedUpload ( uploadName ) ) {		// If the file hasn't been preprocessed or it has just been uncompressed it must be a single file
 			string shortName = genShortFilenameFromPath ( uploadName );
 			string newDir = genDirectoryFromPath ( uploadName ) + SLASH + shortName;
@@ -386,7 +398,7 @@ void MSViewerParameters::initPeakList ( const ParameterList* params )
 		}
 		peakListFpath = tempFileFullPath + SLASH + genShortFilenameFromPath ( uploadPeakListFname );
 		genRename ( uploadName, peakListFpath );
-		processAPLFiles ();		// This can be left out but best to process these before PPProject
+		processAPLFiles ( ujm );		// This can be left out but best to process these before PPProject
 	}
 }
 void MSViewerParameters::initParams ( const ParameterList* params )
@@ -566,11 +578,10 @@ void MSViewerParameters::setConstMod ( const StringVector& s )
 {
 	const_cast <ParameterList*> (pList)->addOrReplaceName ( "const_mod", s );
 }
-void MSViewerParameters::processAPLFiles ()
+void MSViewerParameters::processAPLFiles ( UpdatingJavascriptMessage& ujm )
 {
 	FileList fList ( peakListFpath, "", "", false );
 	StringVector sv = fList.getNameList ();
-	UpdatingJavascriptMessage ujm;
 	for ( StringVectorSizeType i = 0 ; i < sv.size () ; i++ ) {
 		string df2 = sv [i];
 		string path2 =  peakListFpath + SLASH + df2;
@@ -579,5 +590,4 @@ void MSViewerParameters::processAPLFiles ()
 			PPProject::parseAPLFile ( peakListFpath, df2 );
 		}
 	}
-	ujm.deletePreviousMessage ( cout );
 }

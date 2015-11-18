@@ -84,7 +84,7 @@ StringVector SeqdbDir::getDatabaseList ( bool dbSearchFlag ) const
 	for ( int i = 0 ; i < sv.size () ; i++ ) {
 		string db = sv [i];
 		string dbPath = seqdbDir + db;
-		if ( !genFileExists ( dbPath + getDatabaseSuffix ( db ) ) ) continue;	// Check for database file
+		if ( !genFileExists ( dbPath + getDatabaseSuffix ( db ) ) && !genFileExists ( dbPath + ".peff" ) ) continue;	// Check for database file
 		if ( !genFileExists ( dbPath + ".idc" ) ) continue;
 		if ( !genFileExists ( dbPath + ".idi" ) ) continue;
 		if ( !genFileExists ( dbPath + ".idp" ) ) continue;
@@ -131,7 +131,14 @@ string SeqdbDir::getDatabasePath ( const string& databaseName ) const
 {
 	static string databaseSuffix = InfoParams::instance ().getStringValue ( "database_suffix" );
 	string path = seqdbDir + databaseName;
-	if ( !databaseSuffix.empty () && genFileExists ( path + databaseSuffix ) ) path += databaseSuffix;
+	if ( !databaseSuffix.empty () && genFileExists ( path + databaseSuffix ) ) {
+		path += databaseSuffix;
+		return path;
+	}
+	if ( genFileExists ( path + ".peff" ) ) {		// Try a peff suffix
+		path += ".peff";
+		return path;
+	}
 	return path;
 }
 string SeqdbDir::getDatabasePathCreateOrAppend ( const string& databaseName ) const
@@ -144,7 +151,7 @@ string SeqdbDir::getDatabasePathCreateOrAppend ( const string& databaseName ) co
 }
 Version::Version ()
 {
-	version = "5.14.3";
+	version = "5.15.0";
 #ifdef BATCHTAG
 #ifndef MYSQL_DATABASE
 	version += " CL";

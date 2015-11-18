@@ -197,6 +197,7 @@ public:
 	DataConverter5600Instance ( const string& s ) :
 		MGFInstance ( s ) {}
 	string getSpot ( const string& title, const string& defaultSpot ) const;
+	string getMSMSInfo ( const string& title ) const;
 };
 string DataConverter5600Instance::getSpot ( const string& title, const string& defaultSpot ) const
 {
@@ -205,6 +206,17 @@ string DataConverter5600Instance::getSpot ( const string& title, const string& d
 	string::size_type idx3 = title.find ( '.' ) + 1;
 	string::size_type idx2 = title.find ( '.', idx3 ) + 1;
 	string::size_type idx1 = title.find ( '.', idx2 ) + 1;
+	string::size_type idx = title.find ( ' ', idx1 );
+	if ( idx == string::npos )
+		return title.substr ( idx1 );
+	else
+		return title.substr ( idx1, idx-idx1 );
+}
+string DataConverter5600Instance::getMSMSInfo ( const string& title ) const
+{
+//TITLE=Locus:1.1.1.320.2
+//TITLE=Locus:1.1.1.1624.2 File:"120118ry_201B7-32_1_1.wiff"
+	string::size_type idx1 = title.find ( ':' ) + 1;
 	string::size_type idx = title.find ( ' ', idx1 );
 	if ( idx == string::npos )
 		return title.substr ( idx1 );

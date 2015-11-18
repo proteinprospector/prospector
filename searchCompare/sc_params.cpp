@@ -14,7 +14,7 @@
 *  the University of California.  Any unauthorized use, reproduction or       *
 *  transfer of this file is strictly prohibited.                              *
 *                                                                             *
-*  Copyright (2003-2014) The Regents of the University of California.         *
+*  Copyright (2003-2015) The Regents of the University of California.         *
 *                                                                             *
 *  All rights reserved.                                                       *
 *                                                                             *
@@ -33,6 +33,7 @@
 #include <lu_param_list.h>
 #include <sc_params.h>
 #include <sc_sres_rep.h>
+#include <sc_xlink.h>
 #include <sc_quan.h>
 using std::string;
 using std::endl;
@@ -109,6 +110,10 @@ SearchCompareParams::SearchCompareParams ( const ParameterList* params ) :
 	QuantitationMulti::setPurityCorrection ( &purityCorrection );
 	QuantitationMultiMassWindow::setReporterIonWindow ( reporterIonWindow );
 	PeptidePositionQuan::initialiseAACalculator ( aaii.getConstMods (), rawType, quanType, resolution );
+	PeptidePosition::initialiseAACalculator ( aaii.getConstMods () );
+	if ( reportType == "Crosslinked Peptides" ) {
+		SearchResultsCrosslinkPeptideHit::initialiseAACalculator ( aaii.getConstMods () );
+	}
 	PeptidePosition::initialiseComposition ( params->getStringVectorValue ( "comp_ion" ), params->getPQStringVectorValue ( "mass_comp_list" ), params->getStringValue ( "comp_mask_type", "AND" ) );
 	filenames = params->getPQStringVectorValue ( "data" );
 	idFilterList = params->getPQStringVectorValue ( "id_filter_list" );
@@ -131,6 +136,7 @@ SearchCompareParams::SearchCompareParams ( const ParameterList* params ) :
 	projectNames	= params->getPQStringVectorValue ( "project_names" );
 	resultsNames	= params->getPQStringVectorValue ( "results_names" );
 	resultsFullPaths= params->getPQStringVectorValue ( "results_full_paths" );
+	if ( reportType == "Modifications" ) SiteScores::init ( params->getStringVectorValue ( "comp_ion" ), true );
 }
 void SearchCompareParams::setReportItems ( const ParameterList* params )
 {
@@ -168,6 +174,7 @@ void SearchCompareParams::setReportItems ( const ParameterList* params )
 	PeptidePosition::setReportEndAA			( params->getBoolValue ( "report_end_aa" ) );
 	PeptidePosition::setReportPreviousAA	( params->getIntValue ( "report_previous_aa" ) );
 	PeptidePosition::setReportNextAA		( params->getIntValue ( "report_next_aa" ) );
+	PeptidePosition::setReportElemComp		( params->getBoolValue ( "report_elem_comp" ) );
 	PeptidePosition::setReportMissedCleavages( params->getBoolValue ( "report_missed_cleavages" ) );
 	PeptidePosition::setReportMModValue		( params->getBoolValue ( "report_mass_mod" ) );
 	PeptidePosition::setReportLength		( params->getBoolValue ( "report_length" ) );
@@ -206,6 +213,8 @@ void SearchCompareParams::setReportItems ( const ParameterList* params )
 	ProteinInfo::setReportUniprotID	( params->getBoolValue ( "report_uniprot_id" ) );
 	ProteinInfo::setReportGeneName	( params->getBoolValue ( "report_gene_name" ) );
 	ProteinInfo::setReportAccession	( params->getBoolValue ( "report_accession" ) );
+	ProteinInfo::setReportVersion	( params->getBoolValue ( "report_version" ) );
+	ProteinInfo::setReportIndex		( params->getBoolValue ( "report_index" ) );
 	ProteinInfo::setReportLength	( params->getBoolValue ( "report_prot_len" ) );
 	ProteinInfo::setReportMW		( params->getBoolValue ( "report_mw" ) );
 	ProteinInfo::setReportPI		( params->getBoolValue ( "report_pi" ) );

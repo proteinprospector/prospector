@@ -83,6 +83,7 @@ class SearchResultsCrosslinkPeptideHit {
 	int xRank2;
 	double xFirstScore;
 	mutable PeakFitData* quanRatio;
+	static AACalculator* aaCalc;
 
 	static StringVector instrument;
 	static std::vector <Tolerance*> parentTolerances;
@@ -100,6 +101,7 @@ class SearchResultsCrosslinkPeptideHit {
 	static bool reportMSMSInfo;
 	static bool reportStartAA;
 	static bool reportEndAA;
+	static bool reportElemComp;
 	static bool reportRepeats;
 	static bool reportLinks;
 	static bool reportError;
@@ -136,6 +138,7 @@ class SearchResultsCrosslinkPeptideHit {
 		if ( hitPeptide2->getDatabasePeptide () == "" ) return hitPeptide2->getPeptide ();
 		else return hitPeptide2->getDatabasePeptide ();
 	}
+	std::string getElemComp ( const LinkInfo* linkInfo ) const;
 	void runMSProduct ( int i, double score, const LinkInfo* linkInfo ) const;
 public:
 	SearchResultsCrosslinkPeptideHit ( const SpecID* specID, const MSMSSpectrumInfo* mmsi, const PeptideSpectralInfo* psi, double error, const HitPeptide* hitPeptide1, const HitPeptide* hitPeptide2, const XLinkDecoyInfo& xldi, int searchIndex, double xScore1, int xRank1, double xScore2, int xRank2, double xFirstScore );
@@ -143,7 +146,7 @@ public:
 	void printProteinInfoHTML ( std::ostream& os, const SResLink& sresLink ) const;
 	void printHTML ( std::ostream& os, const std::string& styleID, const MSProductLink* productLink, const SCMSTagLink& smtl, const LinkInfo* linkInfo ) const;
 	void printHeaderDelimited ( std::ostream& os, int searchIdx, const PPProteinHitQuanInfo& ppphqi ) const;
-	void printDelimited ( std::ostream& os, const PPProteinHitQuanInfo& ppphqi ) const;
+	void printDelimited ( std::ostream& os, const PPProteinHitQuanInfo& ppphqi, const LinkInfo* linkInfo ) const;
 	static void setReportLinks ( bool f ) { reportLinks = f; }
 	static void setReportError ( bool f ) { reportError = f; }
 	int getFraction () const { return specID->getFraction (); }
@@ -193,6 +196,7 @@ public:
 		return hitPeptide2->getSequence ();
 	}
 	static void init ();
+	static void initialiseAACalculator ( const MapStringConstModPtr& constMods );
 	void setQuanResults ( const LinkInfo* linkInfo ) const;
 	bool outputQuanResults ( std::ostream& os, bool area ) const;
 	DoubleVector getRatios ( bool area ) const;
@@ -294,7 +298,7 @@ public:
 	}
 	void printHTML ( std::ostream& os, const SResLink& sresLink, int searchNumber, const LinkInfo* linkInfo ) const;
 	void printHeaderDelimited ( std::ostream& os, int searchIdx ) const;
-	void printDelimited ( std::ostream& os ) const;
+	void printDelimited ( std::ostream& os, const LinkInfo* linkInfo ) const;
 	static void init ();
 	double getBestExpectationValue () const { return bestExpectationValue; }
 	bool getIntermolecular () const { return cLinkPeptideHits [0]->getIntermolecular (); }

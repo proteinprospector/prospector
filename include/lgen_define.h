@@ -344,6 +344,13 @@ typedef std::map <int, PairStringBool> MapIntToPairStringBool;
 typedef MapIntToPairStringBool::iterator MapIntToPairStringBoolIterator;
 typedef MapIntToPairStringBool::const_iterator MapIntToPairStringBoolConstIterator;
 
+typedef std::map <int, PairIntInt> MapIntToPairIntInt;
+typedef MapIntToPairIntInt::iterator MapIntToPairIntIntIterator;
+typedef MapIntToPairIntInt::const_iterator MapIntToPairIntIntConstIterator;
+typedef std::vector <MapIntToPairIntInt> VectorMapIntToPairIntInt;
+typedef VectorMapIntToPairIntInt::const_iterator VectorMapIntToPairIntIntConstIterator;
+typedef VectorMapIntToPairIntInt::size_type VectorMapIntToPairIntIntSizeType;
+
 typedef std::map <int, VectorPairIntInt> MapIntToVectorPairIntInt;
 typedef MapIntToVectorPairIntInt::iterator MapIntToVectorPairIntIntIterator;
 typedef MapIntToVectorPairIntInt::const_iterator MapIntToVectorPairIntIntConstIterator;
@@ -410,6 +417,21 @@ typedef std::pair <PairStringInt, PairStringInt> PairPairStringIntPairStringInt;
 
 typedef std::map <PairStringString, PairStringString> MapPairStringStringPairStringString;
 typedef MapPairStringStringPairStringString::const_iterator MapPairStringStringPairStringStringConstIterator;
+
+typedef std::vector <PairStringInt> VectorPairStringInt;
+typedef VectorPairStringInt::const_iterator VectorPairStringIntConstIterator;
+typedef VectorPairStringInt::size_type VectorPairStringIntSizeType;
+
+typedef std::vector <VectorPairStringInt> VectorVectorPairStringInt;
+typedef VectorVectorPairStringInt::const_iterator VectorVectorPairStringIntConstIterator;
+typedef VectorVectorPairStringInt::size_type VectorVectorPairStringIntSizeType;
+
+typedef std::vector <VectorVectorPairStringInt> VectorVectorVectorPairStringInt;
+typedef VectorVectorVectorPairStringInt::const_iterator VectorVectorVectorPairStringIntConstIterator;
+typedef VectorVectorVectorPairStringInt::size_type VectorVectorVectorPairStringIntSizeType;
+
+typedef std::map <std::string, MapCharToInt> MapStringToMapCharToInt;
+typedef MapStringToMapCharToInt::const_iterator MapStringToMapCharToIntConstIterator;
 
 class GenUnique {
 	int i;

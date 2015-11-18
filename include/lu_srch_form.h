@@ -703,6 +703,39 @@ public:
 	}
 };
 
+class FormItemModFile : public FormItemSelect {
+	static const char* modFileOptions [];
+public:
+	FormItemModFile ();
+	static std::string getName () { return "mod_AA_file"; }
+};
+
+class FormItemMotifOffset : public FormItemSelect {
+	static const char* offsetOptions [];
+public:
+	FormItemMotifOffset ( const std::string& n = "", int num = 1 );
+	static std::string getName ( const std::string& n = "", int num = 1 )
+	{
+		if ( n.empty () ) return "motif_offset";
+		else {
+			std::string num1 = ( num == 1 ) ? "" : gen_itoa ( num );
+			return n + std::string ( "_motif_offset" ) + num1;
+		}
+	}
+};
+
+class FormItemMotif : public FormItemText {
+public:
+	FormItemMotif ( FormValidatingJavascript* fvj,  const std::string& n = "", int num = 1 );
+	static std::string getName ( const std::string& n = "", int num = 1 ) {
+		if ( n.empty () ) return "motif";
+		else {
+			std::string num1 = ( num == 1 ) ? "" : gen_itoa ( num );
+			return n + std::string ( "_motif" ) + num1;
+		}
+	}
+};
+
 class FormItemLimit : public FormItemSelect {
 	static const char* limitOptions [];
 public:
@@ -790,6 +823,7 @@ void msBridgeJavascriptFunctions ( std::ostream& os );
 void massModCrosslinkingJavascriptFunctions ( std::ostream& os, int n = 1 );
 
 class MassModificationForm : public ProspectorForm {
+	static const int numMotifs;
 	PresentCompIonForm compIonForm;
 	FormValidatingJavascript* fvj;
 	void setValues ( const VectorConstParameterListPtr& params );
@@ -802,6 +836,7 @@ public:
 	virtual void printCGI ( std::ostream& os ) const;
 	virtual void printHTMLJavascriptHidden ( std::ostream& os ) const;
 	bool getDivCL ();
+	static int getNumMotifs () { return numMotifs; }
 };
 
 class ExpandableJavascriptBlock;

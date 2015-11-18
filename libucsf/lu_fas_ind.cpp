@@ -40,6 +40,10 @@ DatabaseIndicies::DatabaseIndicies ( const string& filename, bool createFlag )
 		databasePath = filename.substr ( 0, filename.length () - 6 );	// Cut off .fasta
 		fullDatabasePath = filename;
 	}
+	else if ( filename.find ( ".peff" ) != string::npos ) {
+		databasePath = SeqdbDir::instance ().getSeqdbDir () + filename.substr ( 0, filename.length () - 5 );	// Cut off .peff
+		fullDatabasePath = SeqdbDir::instance ().getDatabasePath ( filename );
+	}
 	else {
 		databasePath = SeqdbDir::instance ().getSeqdbDir () + filename;
 		fullDatabasePath = SeqdbDir::instance ().getDatabasePath ( filename );

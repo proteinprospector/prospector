@@ -94,6 +94,7 @@ struct SingleUserMod {
 		return "Unknown";
 	}
 };
+
 const char* SingleUserMod::typeOptions [] = { "Frequent",
 												"Unusual",
 												"Glycosylation",
@@ -128,6 +129,7 @@ MapStringToInt Usermod::indexMap;
 SingleUserModPtrVector Usermod::singleMods;
 StringVector Usermod::names;
 bool Usermod::productFlag = false;
+SetString Usermod::glycoMods;
 
 Usermod::Usermod ( const string& outputString, const string& formulaStr, char terminalSpecificity, const string& aaList ) :
 	outputString ( outputString ),
@@ -241,6 +243,7 @@ void Usermod::readUsermodFile ( const string& fName )
 			char terminalSpecificity;
 			parseUsermodSpecificityLine ( line3, aaList, terminalSpecificity );
 			singleMods.push_back ( new SingleUserMod ( name, aaList, longName, formulaStr, ElementalFormula ( formulaStr ), terminalSpecificity, type ) );
+			if ( type == "glyco" ) glycoMods.insert ( longName );
 			phase = 1;
 		}
 	}
@@ -436,6 +439,11 @@ MapStringToInt Usermod::getN15Balance ()
 		}
 	}
 	return n15Names;
+}
+bool Usermod::isGlyco ( const string& name )
+{
+	if ( initialised == false ) initialiseUsermod ();
+	return glycoMods.find ( name ) != glycoMods.end ();
 }
 StringVector Usermod::getTypeOptions ()
 {
@@ -1198,10 +1206,12 @@ void FragModContainer::setUserMods ( const vector <Usermod*>& userMod, const AAI
 ExtraUserModInfo::ExtraUserModInfo ()
 {
 }
-ExtraUserModInfo::ExtraUserModInfo ( const string& formula, const string& userAMass, const string& limit ) :
+ExtraUserModInfo::ExtraUserModInfo ( const string& formula, const string& userAMass, const string& limit, const string& motifOffset, const string& motif ) :
 	formula ( formula ),
 	userAMass ( userAMass ),
-	limit ( limit )
+	limit ( limit ),
+	motifOffset ( motifOffset ),
+	motif ( motif )
 {
 }
 ExtraUserMods::ExtraUserMods ()
@@ -1232,7 +1242,7 @@ void ExtraUserMods::addUserMods ( const ParameterList* params )		// MS-Product
 				if ( !flag.second ) {
 					ErrorHandler::genError ()->error ( "User defined variable modification definition repeated.\n" );
 				}
-				ExtraUserModInfo eumi ( comp, "", "" );
+				ExtraUserModInfo eumi ( comp, "", "", "", "" );
 				extraUserMods [make_pair ( label, aaMod )] = eumi;
 				string aaList;
 				char terminalSpecificity;
@@ -1270,7 +1280,9 @@ void ExtraUserMods::addUserMods2 ( const ParameterList* params, int maxUserMods 
 					ErrorHandler::genError ()->error ( "User defined variable modification definition repeated.\n" );
 				}
 				string limit = params->getStringValue ( "mod_" + sNum + "_limit", "Common" );
-				ExtraUserModInfo eumi ( comp, aMass, limit );
+				string motifOffset = params->getStringValue ( "mod_" + sNum + "_motif_offset", "Off" );
+				string motif = params->getStringValue ( "mod_" + sNum + "_motif", "" );
+				ExtraUserModInfo eumi ( comp, aMass, limit, motifOffset, motif );
 				extraUserMods [make_pair ( label, aaMod )] = eumi;
 			}
 		}

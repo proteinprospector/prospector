@@ -29,6 +29,7 @@
 #include <lgen_uncompress.h>
 #include <lg_time.h>
 #include <lu_aa_info.h>
+#include <lu_ambiguity.h>
 #include <lu_app_gr.h>
 #include <lu_blib.h>
 #include <lu_html.h>
@@ -189,24 +190,32 @@ SearchResultsProteinLine::SearchResultsProteinLine ( const string& accessionNumb
 void SearchResultsProteinLine::printHTMLHeader ( ostream& os, const StringVector& searchNames, bool reportUniqPeps ) const
 {
 	tableRowStart ( os );
-		if ( reportNumber ) tableHeader ( os, "Rank", "", "", false, 0, 2 );
-		if ( reportUniqPeps ) tableHeader ( os, "Uniq Pep", "", "", false, 0, 2 );
-		ProteinInfo::printHTMLANumHeader ( os, 2 );
-		for ( ConstSearchResultsProteinInfoPtrVectorSizeType i = 0 ; i < searchResultsInfo.size () ; i++ ) {
-			if ( searchResultsInfo [i]->getColspan () ) {
-				tableHeaderStart ( os, ( i % 2 == 0 ) ? styleID1 : styleID2, "", false, searchResultsInfo [i]->getColspan () );
-				os << ( sresMergedFlag ? "Merged" : searchNames [i] );
-				tableHeaderEnd ( os );
-			}
-		}
-		ProteinInfo::printHTMLHeader ( os, 2 );
+		printHTMLHeader2 ( os, searchNames, reportUniqPeps );
 	tableRowEnd ( os );
 
 	tableRowStart ( os );
-		for ( ConstSearchResultsProteinInfoPtrVectorSizeType j = 0 ; j < searchResultsInfo.size () ; j++ ) {
-			searchResultsInfo [j]->printHeaderHTML ( os, j, ( j % 2 == 0 ) ? styleID1 : styleID2 );
-		}
+		printHTMLHeader3 ( os );
 	tableRowEnd ( os );
+}
+void SearchResultsProteinLine::printHTMLHeader2 ( ostream& os, const StringVector& searchNames, bool reportUniqPeps ) const
+{
+	if ( reportNumber ) tableHeader ( os, "Rank", "", "", false, 0, 2 );
+	if ( reportUniqPeps ) tableHeader ( os, "Uniq Pep", "", "", false, 0, 2 );
+	ProteinInfo::printHTMLANumHeader ( os, 2 );
+	for ( ConstSearchResultsProteinInfoPtrVectorSizeType i = 0 ; i < searchResultsInfo.size () ; i++ ) {
+		if ( searchResultsInfo [i]->getColspan () ) {
+			tableHeaderStart ( os, ( i % 2 == 0 ) ? styleID1 : styleID2, "", false, searchResultsInfo [i]->getColspan () );
+			os << ( sresMergedFlag ? "Merged" : searchNames [i] );
+			tableHeaderEnd ( os );
+		}
+	}
+	ProteinInfo::printHTMLHeader ( os, 2 );
+}
+void SearchResultsProteinLine::printHTMLHeader3 ( ostream& os ) const
+{
+	for ( ConstSearchResultsProteinInfoPtrVectorSizeType i = 0 ; i < searchResultsInfo.size () ; i++ ) {
+		searchResultsInfo [i]->printHeaderHTML ( os, i, ( i % 2 == 0 ) ? styleID1 : styleID2 );
+	}
 }
 void SearchResultsProteinLine::printHTML ( ostream& os, const SResLink& sresLink, const string& id, bool reportUniqPeps ) const
 {
@@ -329,24 +338,34 @@ void SearchResultsPeptideLine::printHTMLHeader ( ostream& os, const StringVector
 {
 	if ( searchNames.size () > 1 ) {
 		tableRowStart ( os );
-			for ( ConstPPPeptideHitInfoPtrVectorSizeType i = 0 ; i < srph.size () ; i++ ) {
-				int colspan = PeptidePosition::getColspan ( sresMergedFlag ? -1 : i );
-				colspan += srph [i]->getPeptideHitInfo ()->getColspan ();
-				if ( colspan ) {
-					tableHeaderStart ( os, ( i % 2 == 0 ) ? styleID1 : styleID2, "", false, colspan );
-					os << ( sresMergedFlag ? "Merged" : searchNames [i] );
-					tableHeaderEnd ( os );
-				}
-			}
+			printHTMLHeader2 ( os, searchNames );
 		tableRowEnd ( os );
 	}
 	tableRowStart ( os );
-		for ( ConstSearchResultsProteinInfoPtrVectorSizeType j = 0 ; j < srph.size () ; j++ ) {
-			string styleID = ( j % 2 == 0 ) ? styleID1 : styleID2;
-			PeptidePosition::printHeaderHTML ( os, sresMergedFlag ? -1 : j, styleID );
-			srph [j]->getPeptideHitInfo ()->printHeaderHTML ( os, styleID );
-		}
+		printHTMLHeader3 ( os );
 	tableRowEnd ( os );
+}
+void SearchResultsPeptideLine::printHTMLHeader2 ( ostream& os, const StringVector& searchNames ) const
+{
+	for ( ConstPPPeptideHitInfoPtrVectorSizeType i = 0 ; i < srph.size () ; i++ ) {
+		int colspan = PeptidePosition::getColspan ( ( sresMergedFlag || sresModsMergedFlag ) ? -1 : i );
+		colspan += srph [i]->getPeptideHitInfo ()->getColspan ();
+		if ( colspan ) {
+			tableHeaderStart ( os, ( i % 2 == 0 ) ? styleID1 : styleID2, "", false, colspan );
+			os << ( sresMergedFlag ? "Merged" : searchNames [i] );
+			tableHeaderEnd ( os );
+		}
+		if ( sresModsMergedFlag ) break;
+	}
+}
+void SearchResultsPeptideLine::printHTMLHeader3 ( ostream& os ) const
+{
+	for ( ConstSearchResultsProteinInfoPtrVectorSizeType i = 0 ; i < srph.size () ; i++ ) {
+		string styleID = ( i % 2 == 0 ) ? styleID1 : styleID2;
+		PeptidePosition::printHeaderHTML ( os, ( sresMergedFlag || sresModsMergedFlag ) ? -1 : i, styleID );
+		srph [i]->getPeptideHitInfo ()->printHeaderHTML ( os, styleID );
+		if ( sresModsMergedFlag ) break;
+	}
 }
 void SearchResultsPeptideLine::printHTMLProteinHeader ( ostream& os, const StringVector& searchNames ) const
 {
@@ -358,10 +377,22 @@ void SearchResultsPeptideLine::printHTMLProteinHeader ( ostream& os, const Strin
 void SearchResultsPeptideLine::printHTML ( ostream& os, const SCMSTagLink& smtl, const string& id ) const		// Peptide Report
 {
 	tableRowStart ( os );
-		for ( ConstPPPeptideHitInfoPtrVectorSizeType i = 0 ; i < srph.size () ; i++ ) {
-			srph [i]->printHTML ( os, proteinInfo, i, ( i % 2 == 0 ) ? styleID1 : styleID2, smtl, id, sresMergedFlag );
-		}
+		printHTML2 ( os, smtl, id );
 	tableRowEnd ( os );
+}
+void SearchResultsPeptideLine::printHTML2 ( ostream& os, const SCMSTagLink& smtl, const string& id ) const		// Peptide Report
+{
+	for ( ConstPPPeptideHitInfoPtrVectorSizeType i = 0 ; i < srph.size () ; i++ ) {
+		printHTML2 ( os, smtl, id, i );
+	}
+}
+void SearchResultsPeptideLine::printHTML2 ( ostream& os, const SCMSTagLink& smtl, const string& id, int i ) const	// Peptide Report
+{
+	srph [i]->printHTML ( os, proteinInfo, i, ( i % 2 == 0 || sresModsMergedFlag ) ? styleID1 : styleID2, smtl, id, sresMergedFlag || sresModsMergedFlag );
+}
+void SearchResultsPeptideLine::printHTMLEmpty ( ostream& os, int i )												// Peptide Report
+{
+	SearchResultsPeptideHit::printHTMLEmpty ( os, i, ( i % 2 == 0 ) ? styleID1 : styleID2 );
 }
 void SearchResultsPeptideLine::printHTML ( ostream& os, int pline, bool empty, bool aNumEmpty, const SCMSTagLink& smtl ) const		// Time Report
 {
@@ -396,57 +427,122 @@ void SearchResultsPeptideLine::printHTMLProtein ( ostream& os, const StringVecto
 		tableRowEnd ( os );
 	}
 }
-void SearchResultsPeptideLine::printDelimitedHeader ( std::ostream& os, const StringVector& searchNames, bool ID, bool reportUniqPeps ) const
+void SearchResultsPeptideLine::printDelimitedHeader ( ostream& os, const StringVector& searchNames, bool ID, bool reportUniqPeps ) const
 {
 	delimitedRowStart ( os );
-		if ( ID )				delimitedEmptyCell ( os );
-		if ( reportNumber )		delimitedEmptyCell ( os );
-		if ( reportUniqPeps )	delimitedEmptyCell ( os );
-		if ( ProteinInfo::getReportAccession () )delimitedEmptyCell ( os );
-		for ( ConstPPPeptideHitInfoPtrVectorSizeType i = 0 ; i < srph.size () ; i++ ) {
-			int colspan = PeptidePosition::getColspan ( i, true );
-			colspan += srph [i]->getPeptideHitInfo ()->getColspan ();
-			colspan += srpi [i]->getColspan ();
-			if ( colspan ) {
-				delimitedHeader ( os, searchNames [i] );
-				delimitedEmptyNCells ( os, colspan - 1 );
+		printDelimitedHeader2 ( os, ID, reportUniqPeps );
+		if ( sresMods ) delimitedEmptyNCells ( os, 3 + ( sresModsMergedFlag ? 1 : searchNames.size () ) );
+		printDelimitedHeader3 ( os, searchNames );
+		printDelimitedHeader4 ( os );
+	delimitedRowEnd ( os );
+	delimitedRowStart ( os );
+		printDelimitedHeader5 ( os, ID, reportUniqPeps );
+		if ( sresMods ) {
+			delimitedHeader ( os, "Modification" );
+			delimitedHeader ( os, "AA" );
+			delimitedHeader ( os, "Site" );
+			if ( sresModsMergedFlag || searchNames.size () == 1 ) {
+				SiteInfo::printDelimitedHeaderSLIP ( os, -1 );
+			}
+			else {
+				for ( int i = 0 ; i < searchNames.size () ; i++ ) {
+					SiteInfo::printDelimitedHeaderSLIP ( os, i );
+				}
 			}
 		}
-		delimitedEmptyNCells ( os, ProteinInfo::getColspan () );
-	delimitedRowEnd ( os );
-	delimitedRowStart ( os );
-		if ( ID ) delimitedHeader ( os, "ID" );
-		if ( reportNumber ) delimitedEmptyCell ( os );
-		if ( reportUniqPeps ) delimitedHeader ( os, "Uniq Pep" );
-		ProteinInfo::printDelimitedANumHeader ( os );
-		for ( ConstPPPeptideHitInfoPtrVectorSizeType j = 0 ; j < srph.size () ; j++ ) {
-			srpi [j]->printHeaderDelimited ( os, sresMergedFlag ? -1 : j );
-			PeptidePosition::printHeaderDelimited ( os, sresMergedFlag ? -1 : j );
-			srph [j]->getPeptideHitInfo ()->printHeaderDelimited ( os );
-		}
-		ProteinInfo::printDelimitedHeader ( os );
+		printDelimitedHeader6 ( os );
+		printDelimitedHeader7 ( os );
 	delimitedRowEnd ( os );
 }
-void SearchResultsPeptideLine::printDelimited ( ostream& os, const string& idStr, int numHomology, const string& id, bool reportUniqPeps ) const
+void SearchResultsPeptideLine::printDelimitedHeader2 ( ostream& os, bool ID, bool reportUniqPeps ) const
+{
+	if ( ID )				delimitedEmptyCell ( os );
+	if ( reportNumber )		delimitedEmptyCell ( os );
+	if ( reportUniqPeps )	delimitedEmptyCell ( os );
+	if ( ProteinInfo::getReportAccession () )delimitedEmptyCell ( os );
+}
+void SearchResultsPeptideLine::printDelimitedHeader3 ( ostream& os, const StringVector& searchNames ) const
+{
+	for ( ConstPPPeptideHitInfoPtrVectorSizeType i = 0 ; i < srph.size () ; i++ ) {
+		int colspan = PeptidePosition::getColspan ( i, true );
+		colspan += srph [i]->getPeptideHitInfo ()->getColspan ();
+		colspan += srpi [i]->getColspan ();
+		if ( colspan ) {
+			delimitedHeader ( os, ( sresMergedFlag || sresModsMergedFlag ) ? "Merged" : searchNames [i] );
+			delimitedEmptyNCells ( os, colspan - 1 );
+		}
+		if ( sresMergedFlag || sresModsMergedFlag ) break;
+	}
+}
+void SearchResultsPeptideLine::printDelimitedHeader4 ( ostream& os ) const
+{
+	delimitedEmptyNCells ( os, ProteinInfo::getColspan () );
+}
+void SearchResultsPeptideLine::printDelimitedHeader5 ( ostream& os, bool ID, bool reportUniqPeps ) const
+{
+	if ( ID ) delimitedHeader ( os, "ID" );
+	if ( reportNumber ) delimitedEmptyCell ( os );
+	if ( reportUniqPeps ) delimitedHeader ( os, "Uniq Pep" );
+	ProteinInfo::printDelimitedANumHeader ( os );
+}
+void SearchResultsPeptideLine::printDelimitedHeader6 ( ostream& os ) const
+{
+	for ( ConstPPPeptideHitInfoPtrVectorSizeType i = 0 ; i < srph.size () ; i++ ) {
+		srpi [i]->printHeaderDelimited ( os, ( sresMergedFlag || sresModsMergedFlag ) ? -1 : i );
+		PeptidePosition::printHeaderDelimited ( os, ( sresMergedFlag || sresModsMergedFlag ) ? -1 : i );
+		srph [i]->getPeptideHitInfo ()->printHeaderDelimited ( os );
+		if ( sresModsMergedFlag ) break;
+	}
+}
+void SearchResultsPeptideLine::printDelimitedHeader7 ( ostream& os ) const
+{
+	ProteinInfo::printDelimitedHeader ( os );
+}
+void SearchResultsPeptideLine::printDelimited ( ostream& os, const string& idStr, int numHomology, const string& idStr2, bool reportUniqPeps ) const
 {
 	delimitedRowStart ( os );
-		if ( !id.empty () ) delimitedCell ( os, id );
-
-		if ( reportNumber ) delimitedCell ( os, "[" + idStr + "]" );
-		if ( reportUniqPeps ) {
-			if ( gen_strcontains ( idStr, '-' ) ) delimitedCell ( os, numHomology );
-			else delimitedCell ( os, "" );
-		}
-		proteinInfo.printDelimitedANum ( os );
-		for ( ConstPPPeptideHitInfoPtrVectorSizeType i = 0 ; i < srph.size () ; i++ ) {
-			srpi [i]->printDelimited ( os );
-			if ( srph [i] )
-				srph [i]->printDelimited ( os, proteinInfo, sresMergedFlag ? -1 : i );
-			else
-				SearchResultsPeptideHit::printDelimitedEmpty ( os, i );
-		}
-		proteinInfo.printDelimited ( os );
+		printDelimited2 ( os, idStr, numHomology, idStr2, reportUniqPeps );
 	delimitedRowEnd ( os );
+}
+void SearchResultsPeptideLine::printDelimited2 ( ostream& os, const string& idStr, int numHomology, const string& idStr2, bool reportUniqPeps ) const
+{
+	printDelimited3 ( os, idStr, numHomology, idStr2, reportUniqPeps );
+	printDelimited4 ( os );
+	printDelimited5 ( os );
+}
+void SearchResultsPeptideLine::printDelimited3 ( ostream& os, const string& idStr, int numHomology, const string& idStr2, bool reportUniqPeps ) const
+{
+	if ( !idStr2.empty () ) delimitedCell ( os, idStr2 );
+
+	if ( reportNumber ) delimitedCell ( os, "[" + idStr + "]" );
+	if ( reportUniqPeps ) {
+		if ( gen_strcontains ( idStr, '-' ) ) delimitedCell ( os, numHomology );
+		else delimitedCell ( os, "" );
+	}
+	proteinInfo.printDelimitedANum ( os );
+}
+void SearchResultsPeptideLine::printDelimited4 ( ostream& os ) const
+{
+	for ( ConstPPPeptideHitInfoPtrVectorSizeType i = 0 ; i < srph.size () ; i++ ) {
+		printDelimited4 ( os, i );
+	}
+}
+void SearchResultsPeptideLine::printDelimited4 ( ostream& os, int i ) const
+{
+	srpi [i]->printDelimited ( os );
+	if ( srph [i] )
+		srph [i]->printDelimited ( os, proteinInfo, ( sresMergedFlag || sresModsMergedFlag ) ? -1 : i );
+	else
+		SearchResultsPeptideHit::printDelimitedEmpty ( os, i );
+}
+void SearchResultsPeptideLine::printDelimited5 ( ostream& os ) const
+{
+	proteinInfo.printDelimited ( os );
+}
+void SearchResultsPeptideLine::printDelimitedEmpty4 ( ostream& os, int i )
+{
+	srpi [i]->printDelimitedEmpty ( os );
+	SearchResultsPeptideHit::printDelimitedEmpty ( os, i );
 }
 void SearchResultsPeptideLine::printProteinSequenceHTML ( ostream& os, bool coverage ) const
 {
@@ -479,6 +575,14 @@ DoubleVectorVector SearchResultsPeptideLine::getRatios ( bool area ) const
 		}
 	}
 	return dvv;
+}
+void SearchResultsPeptideLine::addSiteScores ( SiteScoresVector& siteScores, int line ) const
+{
+	for ( ConstSearchResultsProteinInfoPtrVectorSizeType i = 0 ; i < srpi.size () ; i++ ) {
+		if ( srph [i] ) {
+			srph [i]->addSiteScores ( siteScores [i], line );
+		}
+	}
 }
 SearchResultsReport::SearchResultsReport ( const vector <SearchResults*>& sr, const string& reportHitsType, const string& id ) :
 	searchResults ( sr ),
@@ -1078,8 +1182,8 @@ void SearchResultsPeptideReport::formResultsLines ( const string& sortType, cons
 			vector <const SearchResultsPeptideHit*> sri;
 			ConstSearchResultsProteinInfoPtrVector srpi;
 			if ( sresMergedFlag ) {
-				sri.push_back ( (*jj) );
-				srpi.push_back ( jpi );
+				sri.push_back ( (*jj) );			// vector <const SearchResultsPeptideHit*>
+				srpi.push_back ( jpi );				// ConstSearchResultsProteinInfoPtrVector
 			}
 			else {
 				for ( SearchResultsPtrVectorSizeType kk = 0 ; kk < searchResults.size () ; kk++ ) {
@@ -1525,13 +1629,219 @@ void SearchResultsPeptideReport::printHTMLPeptideTables ( ostream& os, const SCM
 			if ( QuantitationRatio::getAreaRatioReport () ) quanPlot ( os, i, true );
 			if ( QuantitationRatio::getIntRatioReport () ) quanPlot ( os, i, false );
 			os << "<br />" << endl;
-			tableStart ( os, true );
-			srpepl [0]->printHTMLHeader ( os, fullSearchNames );
+			if ( sresMods ) {
+				printHTMLMods ( os, i, smtl );
+			}
+			else {
+				tableStart ( os, true );
+				srpepl [0]->printHTMLHeader ( os, fullSearchNames );
+			}
 		}
-		srpepl [i]->printHTML ( os, smtl, id );
-		if ( i == srpepl.size () - 1 || ( srpepl [i]->getFullAccessionNumber () != srpepl [i+1]->getFullAccessionNumber () ) ) {
-			tableEnd ( os );
-			os << "<hr />" << endl;
+		if ( !sresMods ) {
+			srpepl [i]->printHTML ( os, smtl, id );
+			if ( i == srpepl.size () - 1 || ( srpepl [i]->getFullAccessionNumber () != srpepl [i+1]->getFullAccessionNumber () ) ) {
+				tableEnd ( os );
+				os << "<hr />" << endl;
+			}
+		}
+	}
+}
+bool SearchResultsPeptideReport::createMods ( MapStringToMapIntToSiteInfoVector& msmivsi, MapIntToMapStringToSiteInfoVector& mimssiv, int num ) const
+{
+	bool flag = false;
+	int numS = sresMergedFlag ? 1 : searchResults.size ();
+	SiteScoresVector siteScores (numS);
+	for ( SearchResultsPeptideLinePtrVectorSizeType i = num ; i < srpepl.size () ; i++ ) {
+		srpepl [i]->addSiteScores ( siteScores, i );
+		if ( i == srpepl.size () - 1 || srpepl [i]->getFullAccessionNumber () != srpepl [i+1]->getFullAccessionNumber () ) break;
+	}
+	SiteInfoVector siv ( numS );
+	for ( int ii = 0 ; ii < numS ; ii++ ) {											// For each search
+		StringVector vModString;
+		SiteInfoVectorVector vvSiteInfo;
+		GlycoSiteInfoVector vGlycoSiteInfo;
+		siteScores [ii].getSiteInfo ( vModString, vvSiteInfo, vGlycoSiteInfo );
+		siteScores [ii].clear ();
+		for ( int j = 0 ; j < vvSiteInfo.size () ; j++ ) {
+			for ( int k = 0 ; k < vvSiteInfo [j].size () ; k++ ) {
+				int site = vvSiteInfo [j][k].site;
+				flag = true;
+				if ( msmivsi [vModString [j]].find ( site ) == msmivsi[vModString [j]].end () ) msmivsi[vModString [j]][site] = siv;
+				msmivsi [vModString [j]][site][ii] = vvSiteInfo [j][k];
+			}
+		}
+		for ( int x = 0 ; x < vGlycoSiteInfo.size () ; x++ ) {
+			int site = vGlycoSiteInfo [x].site;
+			string mod = vGlycoSiteInfo [x].mod;
+			flag = true;
+			if ( mimssiv [site].find ( mod ) == mimssiv[site].end () ) mimssiv[site][mod] = siv;
+			mimssiv [site][mod][ii] = vGlycoSiteInfo [x];
+		}
+	}
+	return flag;
+}
+void SearchResultsPeptideReport::printHTMLModsHeader ( ostream& os ) const
+{
+	int numS = sresModsMergedFlag ? 1 : searchResults.size ();
+	if ( fullSearchNames.size () > 1 ) {
+		tableRowStart ( os );
+			tableHeader ( os, "Modification", "", "", false, 0, 2 );
+			tableHeader ( os, "AA", "", "", false, 0, 2 );
+			tableHeader ( os, "Site", "", "", false, 0, 2 );
+			if ( sresModsMergedFlag || numS == 1 )
+				SiteInfo::printHTMLHeaderSLIP ( os, -1, 2 );
+			else
+				for ( int i = 0 ; i < numS ; i++ ) SiteInfo::printHTMLHeaderSLIP ( os, i, 2 );
+			srpepl [0]->printHTMLHeader2 ( os, fullSearchNames );
+		tableRowEnd ( os );
+	}
+	tableRowStart ( os );
+		if ( fullSearchNames.size () == 1 ) {
+			tableHeader ( os, "Modification" );
+			tableHeader ( os, "AA" );
+			tableHeader ( os, "Site" );
+			if ( sresModsMergedFlag || numS == 1 )
+				SiteInfo::printHTMLHeaderSLIP ( os, -1, 1 );
+			else
+				for ( int i = 0 ; i < numS ; i++ ) SiteInfo::printHTMLHeaderSLIP ( os, i, 1 );
+		}
+		srpepl [0]->printHTMLHeader3 ( os );
+	tableRowEnd ( os );
+}
+int SearchResultsPeptideReport::getBestSLIPIndex ( const SiteInfoVector& siv ) const
+{
+	int bestSLIP = -3;
+	int bestIndex = 0;
+	for ( int i = 0 ; i < siv.size () ; i++ ) {
+		int slip = siv [i].slip;
+		if ( slip == -2 ) continue;					// No SLIP
+		if ( slip == -1 ) {							// There is an unambiguous assignment
+			bestSLIP = -1;
+			break;
+		}
+		else {
+			if ( slip > bestSLIP ) {
+				bestSLIP = slip;
+				bestIndex = i;
+			}
+		}
+	}
+	if ( bestSLIP == -1 ) {
+		double bestMascotScore = -1;
+		for ( int i = 0 ; i < siv.size () ; i++ ) {
+			int line = siv [i].index;
+			if ( line != -2 ) {
+				double mascotScore = srpepl [line]->getMascotScore ( i );
+				if ( mascotScore > bestMascotScore ) {
+					bestMascotScore = mascotScore;
+					bestIndex = i;
+				}
+			}
+		}
+	}
+	return bestIndex;
+}
+void SearchResultsPeptideReport::printHTMLModsRow ( ostream& os, const string& mod, int site, const SiteInfoVector& siv, const SCMSTagLink& smtl ) const
+{
+	tableRowStart ( os );
+		tableCell ( os, mod, true );														// mod
+		for ( int i = 0 ; i < siv.size () ; i++ ) if ( siv [i].printHTMLAA ( os ) ) break;	// aa
+		tableCell ( os, site, true );														// site
+		if ( sresModsMergedFlag ) {
+			int bestIndex = getBestSLIPIndex ( siv );
+			siv [bestIndex].printHTMLSLIP ( os );											// slip
+			srpepl [siv [bestIndex].index]->printHTML2 ( os, smtl, id, bestIndex );
+		}
+		else {
+			for ( int j = 0 ; j < siv.size () ; j++ ) siv [j].printHTMLSLIP ( os );			// slip
+			for ( int k = 0 ; k < siv.size () ; k++ ) {
+				int line = siv [k].index;
+				if ( line == -2 )	SearchResultsPeptideLine::printHTMLEmpty ( os, k );
+				else				srpepl [line]->printHTML2 ( os, smtl, id, k );
+			}
+		}
+	tableRowEnd ( os );
+}
+void SearchResultsPeptideReport::printHTMLMods ( ostream& os, int num, const SCMSTagLink& smtl ) const
+{
+	MapStringToMapIntToSiteInfoVector msmisiv;
+	MapIntToMapStringToSiteInfoVector mimssiv;
+	if ( createMods ( msmisiv, mimssiv, num ) ) {
+		bool header = false;
+		tableStart ( os, true );
+			for ( MapStringToMapIntToSiteInfoVectorConstIterator i = msmisiv.begin () ; i != msmisiv.end () ; i++ ) {	// Normal mods
+				string mod = (*i).first;
+				const MapIntToSiteInfoVector& misiv = (*i).second;
+				for ( MapIntToSiteInfoVectorConstIterator j = misiv.begin () ; j != misiv.end () ; j++ ) {				// For each site
+					int site = (*j).first;
+					const SiteInfoVector& siv = (*j).second;
+					if ( !header ) printHTMLModsHeader ( os );
+					header = true;
+					printHTMLModsRow ( os, mod, site, siv, smtl );
+				}
+			}
+			for ( MapIntToMapStringToSiteInfoVectorConstIterator x = mimssiv.begin () ; x != mimssiv.end () ; x++ ) {	// Glyco mods
+				int site = (*x).first;
+				const MapStringToSiteInfoVector& mssiv = (*x).second;
+				for ( MapStringToSiteInfoVectorConstIterator y = mssiv.begin () ; y != mssiv.end () ; y++ ) {			// For each site
+					string mod = (*y).first;
+					const SiteInfoVector& siv = (*y).second;
+					if ( !header ) printHTMLModsHeader ( os );
+					header = true;
+					printHTMLModsRow ( os, mod, site, siv, smtl );
+				}
+			}
+		tableEnd ( os );
+	}
+	else {
+		os << "<b>No modified peptides found for this protein.</b><br />" << endl;
+	}
+	os << "<br />" << endl;
+	os << "<hr />" << endl;
+}
+void SearchResultsPeptideReport::printDelimitedModsRow ( ostream& os, const string& mod, int site, const SiteInfoVector& siv, const string& idStr, const string& idStr2, int numHomology ) const
+{
+	delimitedRowStart ( os );
+		int line1;
+		for ( int i = 0 ; i < siv.size () ; i++ )	if ( siv [i].getIndex ( line1 ) ) break;								
+		srpepl [line1]->printDelimited3 ( os, idStr, numHomology, idStr2, reportUniqPeps );
+		delimitedCell ( os, mod );																	// mod
+		for ( int j = 0 ; j < siv.size () ; j++ )	if ( siv [j].printDelimitedAA ( os ) ) break;	// aa
+		delimitedCell ( os, site );																	// site
+		if ( sresModsMergedFlag ) {
+			int bestIndex = getBestSLIPIndex ( siv );
+			siv [bestIndex].printDelimitedSLIP ( os );												// slip
+			srpepl [siv [bestIndex].index]->printDelimited4 ( os, bestIndex );
+		}
+		else {
+			for ( int i = 0 ; i < siv.size () ; i++ )	siv [i].printDelimitedSLIP ( os );				// slip
+			for ( int j = 0 ; j < siv.size () ; j++ ) {
+				int line;
+				if ( siv [j].getIndex ( line ) )	srpepl [line]->printDelimited4 ( os, j );
+				else								srpepl [line1]->printDelimitedEmpty4 ( os, j );		// Use the line1 from above
+			}
+		}
+		srpepl [line1]->printDelimited5 ( os );
+	delimitedRowEnd( os );
+}
+void SearchResultsPeptideReport::printDelimitedMods ( ostream& os, int num, const string& idStr, int numHomology, const string& idStr2, bool reportUniqPeps ) const
+{
+	MapStringToMapIntToSiteInfoVector msmisiv;
+	MapIntToMapStringToSiteInfoVector mimssiv;
+	if ( createMods ( msmisiv, mimssiv, num  ) ) {
+		for ( MapStringToMapIntToSiteInfoVectorConstIterator i = msmisiv.begin () ; i != msmisiv.end () ; i++ ) {
+			string mod = (*i).first;
+			const MapIntToSiteInfoVector& misiv = (*i).second;
+			for ( MapIntToSiteInfoVectorConstIterator j = misiv.begin () ; j != misiv.end () ; j++ ) {
+				printDelimitedModsRow ( os, mod, (*j).first, (*j).second, idStr, idStr2, numHomology );	// os, mod, site, siv...........
+			}
+		}
+		for ( MapIntToMapStringToSiteInfoVectorConstIterator x = mimssiv.begin () ; x != mimssiv.end () ; x++ ) {	// For each mod
+			int site = (*x).first;
+			const MapStringToSiteInfoVector& mssiv = (*x).second;
+			for ( MapStringToSiteInfoVectorConstIterator y = mssiv.begin () ; y != mssiv.end () ; y++ ) {			// For each site
+				printDelimitedModsRow ( os, (*y).first, site, (*y).second, idStr, idStr2, numHomology );			// os, mod, site, siv...........
+			}
 		}
 	}
 }
@@ -2371,8 +2681,8 @@ void SearchResultsPeptideReport::printDelimited ( ostream& os ) const
 		SearchResultsProteinReport::printDelimited ( os );
 	}
 	else {
-		string str;
-		if ( id != SearchResults::getDefaultID () ) str = id;
+		string idStr2;
+		if ( id != SearchResults::getDefaultID () ) idStr2 = id;
 		int protInd = 0;
 		string lineStr;
 		int numHomology;
@@ -2385,9 +2695,10 @@ void SearchResultsPeptideReport::printDelimited ( ostream& os ) const
 					lineStr = srprotl [protInd]->getIDStrVecOutput ();
 					numHomology = srprotl [protInd]->getNumHomology ();
 					protInd++;
+					if ( sresMods ) printDelimitedMods ( os, i, lineStr, numHomology, idStr2, reportUniqPeps );
 				}
 			}
-			srpepl [i]->printDelimited ( os, lineStr, numHomology, str, reportUniqPeps );
+			if ( !sresMods ) srpepl [i]->printDelimited ( os, lineStr, numHomology, idStr2, reportUniqPeps );
 		}
 	}
 }

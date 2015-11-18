@@ -63,6 +63,7 @@ bool SearchResultsCrosslinkPeptideHit::reportIntensity = false;
 bool SearchResultsCrosslinkPeptideHit::reportMSMSInfo = false;
 bool SearchResultsCrosslinkPeptideHit::reportStartAA = false;
 bool SearchResultsCrosslinkPeptideHit::reportEndAA = false;
+bool SearchResultsCrosslinkPeptideHit::reportElemComp = false;
 bool SearchResultsCrosslinkPeptideHit::reportRepeats = false;
 bool SearchResultsCrosslinkPeptideHit::reportLinks = false;
 bool SearchResultsCrosslinkPeptideHit::reportError = false;
@@ -82,6 +83,8 @@ int SearchResultsCrosslinkPeptideHit::reportPreviousAA = 0;
 bool SearchResultsCrosslinkPeptideHit::reportDBPeptide = false;
 int SearchResultsCrosslinkPeptideHit::reportNextAA = 0;
 bool SearchResultsCrosslinkPeptideHit::extraInfo = false;
+
+AACalculator* SearchResultsCrosslinkPeptideHit::aaCalc = 0;
 
 SearchResultsCrosslinkPeptideHit::SearchResultsCrosslinkPeptideHit ( const SpecID* specID, const MSMSSpectrumInfo* mmsi, const PeptideSpectralInfo* psi, double error, const HitPeptide* hitPeptide1, const HitPeptide* hitPeptide2, const XLinkDecoyInfo& xldi, int searchIndex, double xScore1, int xRank1, double xScore2, int xRank2, double xFirstScore ) :
 	peptideHitInfo ( psi ),
@@ -115,6 +118,7 @@ void SearchResultsCrosslinkPeptideHit::printHeaderHTML ( ostream& os, const stri
 		if ( reportIntensity )	tableHeader ( os, "Intensity", styleID, "", false );
 		if ( reportError )		tableHeader ( os, parentTolerances [searchIdx]->getUnitsString (), styleID );
 		if ( reportXLPeptide )	tableHeader ( os, "Crosslinked Peptide", styleID );
+		if ( reportElemComp )	tableHeader ( os, "Elemental<br />Composition", styleID );
 		if ( reportTime ) {
 			if ( fractionNames [searchIdx].size () > 1 ) tableHeader ( os, "Fraction", styleID );
 			SpecID::printTableHeader ( os, spottingPlates [searchIdx], spottingPlates [searchIdx] || spectrumNumber [searchIdx], styleID );
@@ -159,6 +163,7 @@ void SearchResultsCrosslinkPeptideHit::printHeaderDelimited ( ostream& os, int s
 		if ( reportDBPeptide )	delimitedHeader ( os, "DB Peptide 2" );
 		if ( reportXLPeptide )	delimitedHeader ( os, "Peptide 2" );
 		if ( reportNextAA )		delimitedHeader ( os, "Next AA 2" );
+		if ( reportElemComp )	delimitedHeader ( os, "Elemental Composition" );
 		if ( reportTime ) {
 			delimitedHeader ( os, "Fraction" );
 			SpecID::printDelimitedHeader ( os, spottingPlates [searchIdx], spottingPlates [searchIdx] || spectrumNumber [searchIdx] );
@@ -247,6 +252,7 @@ void SearchResultsCrosslinkPeptideHit::printHTML ( ostream& os, const string& st
 			if ( PeptidePosition::getRunMSProductFlag () ) runMSProduct ( searchIndex, peptideHitInfo.getScore (), linkInfo );
 		tableHeaderEnd ( os );
 	}
+	if ( reportElemComp ) tableCell ( os, getElemComp ( linkInfo ), false, false, styleID, 0, 2 );
 	if ( reportTime ) {
 		if ( fractionNames [searchIndex].size () > 1 ) tableCell ( os, fractionNames [searchIndex][getFraction ()-1], false, false, styleID, 0, 2 );
 		bool sPlates = spottingPlates [searchIndex];
@@ -297,6 +303,26 @@ void SearchResultsCrosslinkPeptideHit::printHTML ( ostream& os, const string& st
 	if ( reportRepeats )tableCell ( os, xldi.getRepeats2 ( 0 ), true, false, styleID );
 	tableRowEnd ( os );
 	tableEmptyRow ( os );
+}
+string SearchResultsCrosslinkPeptideHit::getElemComp ( const LinkInfo* linkInfo ) const
+{	
+	ElementalFormula ef;
+	try {
+		if ( !aaCalc->calculateStrippedElementalCompositionWithTerminii ( hitPeptide1->getPeptide (), hitPeptide1->getNTerm (), hitPeptide1->getCTerm (), hitPeptide1->getNeutralLoss (), ef, false ) ) {
+			return "";
+		}
+		ElementalFormula ef2;
+		if ( !aaCalc->calculateStrippedElementalCompositionWithTerminii ( hitPeptide2->getPeptide (), hitPeptide2->getNTerm (), hitPeptide2->getCTerm (), hitPeptide2->getNeutralLoss (), ef2, false ) ) {
+			return "";
+		}
+		ef += ef2;
+		ef += linkInfo->getBridgeFormula ();
+		ef -= "H";
+	}
+	catch ( AACalculatorNoElementalComposition ) {
+		return "";
+	}
+	return ef.getFormula ();
 }
 void SearchResultsCrosslinkPeptideHit::runMSProduct ( int i, double score, const LinkInfo* linkInfo ) const
 {
@@ -359,7 +385,7 @@ void SearchResultsCrosslinkPeptideHit::runMSProduct ( int i, double score, const
 	genSystem ( command, "", true );
 	genUnlink ( tempFileFullPath );
 }
-void SearchResultsCrosslinkPeptideHit::printDelimited ( ostream& os, const PPProteinHitQuanInfo& ppphqi ) const
+void SearchResultsCrosslinkPeptideHit::printDelimited ( ostream& os, const PPProteinHitQuanInfo& ppphqi, const LinkInfo* linkInfo ) const
 {
 	delimitedRowStart ( os );
 	if ( reportMPlusH )		delimitedCell ( os, getMPlusH (), 4 );
@@ -392,6 +418,7 @@ void SearchResultsCrosslinkPeptideHit::printDelimited ( ostream& os, const PPPro
 	}
 	if ( reportNextAA )		delimitedCell ( os, getNextAA2 () );
 
+	if ( reportElemComp )	delimitedCell ( os, getElemComp ( linkInfo ) );
 	if ( reportTime ) {
 		delimitedCell ( os, fractionNames [searchIndex][getFraction ()-1] );
 		specID->printDelimitedCell ( os, spottingPlates [searchIndex], spottingPlates [searchIndex] || spectrumNumber [searchIndex] );
@@ -456,6 +483,7 @@ void SearchResultsCrosslinkPeptideHit::init ()
 	reportMSMSInfo	= PeptidePosition::getReportMSMSInfo ();
 	reportStartAA	= PeptidePosition::getReportStartAA ();
 	reportEndAA		= PeptidePosition::getReportEndAA ();
+	reportElemComp	= PeptidePosition::getReportElemComp ();
 	reportError		= PeptidePosition::getReportError ();
 	reportLinks		= PeptidePosition::getReportLinks ();
 	reportTime		= PeptidePosition::getReportTime ();
@@ -474,6 +502,10 @@ void SearchResultsCrosslinkPeptideHit::init ()
 	reportXLLowEVal		= pList->getBoolValue ( "report_xl_low_expectation" );
 	reportXLLowMValue	= pList->getBoolValue ( "report_xl_low_nlog_p" );
 	reportXLAA			= pList->getBoolValue ( "report_xl_aa" );
+}
+void SearchResultsCrosslinkPeptideHit::initialiseAACalculator ( const MapStringConstModPtr& constMods )
+{
+	aaCalc = new AACalculator ( true, constMods );
 }
 bool SearchResultsCrosslinkPeptideHit::outputQuanResults ( ostream& os, bool area ) const
 {
@@ -536,10 +568,10 @@ void SearchResultsCrosslinkProteinHit::printHeaderDelimited ( ostream& os, int s
 {
 	cLinkPeptideHits [0]->printHeaderDelimited ( os, searchIdx, ppphqi );
 }
-void SearchResultsCrosslinkProteinHit::printDelimited ( ostream& os ) const
+void SearchResultsCrosslinkProteinHit::printDelimited ( ostream& os, const LinkInfo* linkInfo ) const
 {
 	for ( int i = 0 ; i < cLinkPeptideHits.size () ; i++ ) {
-		cLinkPeptideHits [i]->printDelimited ( os, ppphqi );
+		cLinkPeptideHits [i]->printDelimited ( os, ppphqi, linkInfo );
 	}
 }
 void SearchResultsCrosslinkProteinHit::addSpecIDs ( SetSpecID& ssid ) const

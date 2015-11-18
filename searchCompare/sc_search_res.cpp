@@ -165,6 +165,8 @@ void ProteinInfo::initialiseAccessionNumberLink ( ostream& os )
 bool ProteinInfo::reportUniprotID = true;
 bool ProteinInfo::reportGeneName = true;
 bool ProteinInfo::reportAccession = true;
+bool ProteinInfo::reportVersion = false;
+bool ProteinInfo::reportIndex = false;
 bool ProteinInfo::reportLength = false;
 bool ProteinInfo::reportMW = true;
 bool ProteinInfo::reportPI = true;
@@ -316,6 +318,8 @@ void ProteinInfo::printHTMLHeader ( ostream& os, int rowspan )
 void ProteinInfo::printHTMLANumHeader ( ostream& os, int rowspan )
 {
 	if ( reportAccession )	tableHeader ( os, "Acc #", "", "", false, 0, rowspan );
+	if ( reportVersion )	tableHeader ( os, "Version", "", "", false, 0, rowspan );
+	if ( reportIndex )		tableHeader ( os, "Index", "", "", false, 0, rowspan );
 	if ( reportUniprotID )	tableHeader ( os, "UniProt ID", "", "", false, 0, rowspan );
 	if ( reportGeneName )	tableHeader ( os, "Gene", "", "", false, 0, rowspan );
 }
@@ -357,6 +361,8 @@ void ProteinInfo::printHTMLANum ( ostream& os, bool empty ) const
 {
 	if ( empty || accessionNumbers.empty () ) {
 		if ( reportAccession )	tableEmptyCell ( os );
+		if ( reportVersion )	tableEmptyCell ( os );
+		if ( reportIndex )		tableEmptyCell ( os );
 		if ( reportUniprotID )	tableEmptyCell ( os );
 		if ( reportGeneName )	tableEmptyCell ( os );
 	}
@@ -369,6 +375,8 @@ void ProteinInfo::printHTMLANum ( ostream& os, bool empty ) const
 			if ( openReadingFrame != -1 ) os << "." << openReadingFrame;
 			tableCellEnd ( os );
 		}
+		if ( reportVersion )	tableCell ( os, sequenceVersion [prefSpInd] );
+		if ( reportIndex )		tableCell ( os, indexNum );
 		if ( reportUniprotID ) {
 			tableCellStart ( os );
 			upidli [databaseIndex].write2 ( os, uniprotIDs [prefSpInd], reportLinks && indexNum != -1 );
@@ -418,12 +426,16 @@ void ProteinInfo::printHTMLLines ( ostream& os ) const
 		genPrint ( os, proteinPI, 1 );
 		os << " ";
 		os << "<b>Protein Length: </b>" << length;
+		os << " ";
+		os << "<b>Index: </b>" << indexNum;
 		os << "<br />" << endl;
 	}
 }
 void ProteinInfo::printDelimitedANumHeader ( ostream& os )
 {
 	if ( reportAccession )	delimitedHeader ( os, "Acc #" );
+	if ( reportVersion )	delimitedHeader ( os, "Version" );
+	if ( reportIndex )		delimitedHeader ( os, "Index" );
 	if ( reportUniprotID )	delimitedHeader ( os, "UniProt ID" );
 	if ( reportGeneName )	delimitedHeader ( os, "Gene" );
 }
@@ -459,6 +471,8 @@ void ProteinInfo::printDelimitedANum ( ostream& os ) const
 {
 	if ( accessionNumbers.empty () ) {
 		if ( reportAccession )	delimitedEmptyCell ( os );
+		if ( reportVersion )	delimitedEmptyCell ( os );
+		if ( reportIndex )		delimitedEmptyCell ( os );
 		if ( reportUniprotID )	delimitedEmptyCell ( os );
 		if ( reportGeneName )	delimitedEmptyCell ( os );
 	}
@@ -477,6 +491,8 @@ void ProteinInfo::printDelimitedANum ( ostream& os ) const
 
 			delimitedCell ( os, ost.str () );
 		}
+		if ( reportVersion )	delimitedCell ( os, sequenceVersion [prefSpInd] );
+		if ( reportIndex )		delimitedCell ( os, indexNum );
 		if ( reportUniprotID ) {
 			if ( decoy || isFullyDecoyDatabase ( dbase [databaseIndex] ) )
 				delimitedCell ( os, "decoy" ); 
@@ -1002,6 +1018,7 @@ bool PeptidePosition::reportTime = false;
 bool PeptidePosition::reportMSMSInfo = false;
 bool PeptidePosition::reportStartAA = false;
 bool PeptidePosition::reportEndAA = false;
+bool PeptidePosition::reportElemComp = false;
 bool PeptidePosition::reportMissedCleavages = false;
 bool PeptidePosition::reportLength = false;
 bool PeptidePosition::reportComposition = false;
@@ -1160,6 +1177,7 @@ int PeptidePosition::getColspan ( int searchNumber, bool tabDelim, bool showTime
 	colspan += PeptidePositionQuan::getColspan ( searchNumber );
 	if ( reportStartAA )	colspan++;
 	if ( reportEndAA )		colspan++;
+	if ( reportElemComp )	colspan++;
 	return colspan;
 }
 int PeptidePosition::getColspanPeak1 ()
@@ -1229,6 +1247,7 @@ void PeptidePosition::printHeaderHTML ( ostream& os, int searchNumber, const str
 	PeptidePositionQuan::printHeaderHTML ( os, searchNumber, styleID );
 	if ( reportStartAA )	tableHeader ( os, "Start", styleID );
 	if ( reportEndAA )		tableHeader ( os, "End", styleID );
+	if ( reportElemComp )	tableHeader ( os, "Elemental Composition", styleID );
 }
 void PeptidePosition::printHeaderHTMLPeak1 ( ostream& os, const string& styleID, int rowspan )
 {
@@ -1298,6 +1317,19 @@ string PeptidePosition::getMissedCleavages () const
 	if ( enzymeInit ) return gen_itoa ( enzyme_fragmenter ( getDBPeptide () ).size () - 1 );
 	else return "-";
 }
+string PeptidePosition::getElemComp () const
+{
+	ElementalFormula ef;
+	try {
+		if ( !aaCalc->calculateStrippedElementalCompositionWithTerminii ( getPeptide (), getNTerm (), getCTerm (), getNeutralLoss (), ef ) ) {
+			return "";
+		}
+	}
+	catch ( AACalculatorNoElementalComposition ) {
+		return "";
+	}
+	return ef.getFormula ();
+}
 void PeptidePosition::printParamsHTML ( ostream& os, int searchNumber )
 {
 	ExpandableJavascriptBlock ejb ( "Original Search Parameters " + gen_itoa ( searchNumber + 1 ) );
@@ -1338,6 +1370,7 @@ void PeptidePosition::printHTMLEmpty ( ostream& os, int searchNumber, const stri
 	PeptidePositionQuan::printQuanBlankHTML ( os, searchNumber, styleID );
 	if ( reportStartAA )	tableEmptyCell ( os, styleID );
 	if ( reportEndAA )		tableEmptyCell ( os, styleID );
+	if ( reportElemComp )	tableEmptyCell ( os, styleID );
 }
 void PeptidePosition::printHTMLEmptyPeak1 ( ostream& os, const string& styleID )
 {
@@ -1377,6 +1410,7 @@ void PeptidePosition::printDelimitedEmpty ( ostream& os, int searchNumber, bool 
 	PeptidePositionQuan::printQuanBlankDelimited ( os, searchNumber );
 	if ( reportStartAA )	delimitedEmptyCell ( os );
 	if ( reportEndAA )		delimitedEmptyCell ( os );
+	if ( reportElemComp )	delimitedEmptyCell ( os );
 }
 void PeptidePosition::printDelimitedEmptyPeak1 ( ostream& os )
 {
@@ -1521,6 +1555,7 @@ void PeptidePosition::printHTML ( ostream& os, const ProteinInfo& proteinInfo, c
 		if ( reportStartAA )tableCell ( os, startAA, false, styleID );
 		if ( reportEndAA )	tableCell ( os, getEndAA (), false, styleID );
 	}
+	if ( reportElemComp )	tableCell ( os, getElemComp (), true, false, styleID );
 	delete productLink;
 }
 void PeptidePosition::printHTMLPeak1 ( ostream& os, const string& styleID ) const
@@ -1596,6 +1631,7 @@ void PeptidePosition::printHeaderDelimited ( ostream& os, int searchNumber, bool
 	PeptidePositionQuan::printHeaderDelimited ( os, searchNumber );
 	if ( reportStartAA )	delimitedHeader ( os, "Start" );
 	if ( reportEndAA )		delimitedHeader ( os, "End" );
+	if ( reportElemComp )	delimitedHeader ( os, "Elemental Composition" );
 }
 void PeptidePosition::printHeaderDelimitedPeak1 ( ostream& os )
 {
@@ -1696,6 +1732,7 @@ void PeptidePosition::printDelimited ( ostream& os, const ProteinInfo& proteinIn
 		if ( reportStartAA )delimitedCell ( os, startAA );
 		if ( reportEndAA )	delimitedCell ( os, getEndAA () );
 	}
+	if ( reportElemComp )	delimitedCell ( os, getElemComp () );
 }
 void PeptidePosition::printDelimitedPeak1 ( ostream& os ) const
 {
@@ -1882,7 +1919,14 @@ void PeptidePosition::initialise ( const SearchResultsPtrVector& searchResults )
 	multipleFractionNames = fractionNamesSet.size () > 1;
 	PeptidePositionQuan::initialise ( searchResults );
 }
-
+void PeptidePosition::addSiteScores ( SiteScores& siteScores, int line ) const
+{
+	siteScores.add ( getDBPeptide (), SCModInfo::getModsString ( searchIndex, specID, getDBPeptide (), startAA ), startAA, line );	// peptide, mods, start, tenLogP
+}
+void PeptidePosition::initialiseAACalculator ( const MapStringConstModPtr& constMods )
+{
+	aaCalc = new AACalculator ( true, constMods );
+}
 bool SearchResultsProteinInfo::reportScore = false;
 bool SearchResultsProteinInfo::reportNumUnique = false;
 bool SearchResultsProteinInfo::reportPeptideCount = false;
@@ -1932,10 +1976,7 @@ void SearchResultsProteinInfo::printHeaderDelimited ( ostream& os, int index ) c
 void SearchResultsProteinInfo::printDelimited ( ostream& os ) const
 {
 	if ( score == 0.0 ) {
-		if ( reportScore )			delimitedEmptyCell ( os );
-		if ( reportNumUnique )		delimitedEmptyCell ( os );
-		if ( reportPeptideCount )	delimitedEmptyCell ( os );
-		if ( reportBestScore )		delimitedEmptyCell ( os );
+		printDelimitedEmpty ( os );
 	}
 	else {
 		if ( reportScore )			delimitedCell ( os, score, 1 );
@@ -1943,6 +1984,13 @@ void SearchResultsProteinInfo::printDelimited ( ostream& os ) const
 		if ( reportPeptideCount )	delimitedCell ( os, peptideCount );
 		if ( reportBestScore )		delimitedCell ( os, bestScore, 1 );
 	}
+}
+void SearchResultsProteinInfo::printDelimitedEmpty ( ostream& os ) const
+{
+	if ( reportScore )			delimitedEmptyCell ( os );
+	if ( reportNumUnique )		delimitedEmptyCell ( os );
+	if ( reportPeptideCount )	delimitedEmptyCell ( os );
+	if ( reportBestScore )		delimitedEmptyCell ( os );
 }
 SearchResultsProteinInfo::~SearchResultsProteinInfo () {}
 void SearchResultsProteinInfo::setParams ( const ParameterList* params )
@@ -2296,6 +2344,18 @@ void SearchResultsPeptideHit::printDelimitedEmpty ( ostream& os, int searchNumbe
 	static PPPeptideHitInfo emptyPeptideHit;
 	PeptidePosition::printDelimitedEmpty ( os, searchNumber );
 	emptyPeptideHit.printDelimited ( os );
+}
+void SearchResultsPeptideHit::printHTMLEmpty ( ostream& os, int searchNumber, const string& styleID )
+{
+	static PPPeptideHitInfo emptyPeptideHit;
+	PeptidePosition::printHTMLEmpty ( os, searchNumber, styleID );
+	emptyPeptideHit.printHTML ( os, styleID );
+}
+void SearchResultsPeptideHit::addSiteScores ( SiteScores& siteScores, int line ) const
+{
+	if ( hasSpecID () ) {
+		peptidePosition.addSiteScores ( siteScores, line );
+	}
 }
 bool PPProteinHitQuanInfo::reportArea = false;
 bool PPProteinHitQuanInfo::reportIntensity = false;
@@ -2706,6 +2766,14 @@ void PPProteinHitInfo::printDelimited ( ostream& os ) const
 		if ( reportBestExpectVal ) delimitedCellSigFig ( os, bestExpectationValue, 2 );
 		ppphqi.printDelimited ( os );
 	}
+}
+void PPProteinHitInfo::printDelimitedEmpty ( ostream& os ) const
+{
+	SearchResultsProteinInfo::printDelimitedEmpty ( os );
+	if ( reportCoverage )		delimitedEmptyCell ( os );
+	if ( reportBestDiscScore )	delimitedEmptyCell ( os );
+	if ( reportBestExpectVal )	delimitedEmptyCell ( os );
+	ppphqi.printDelimitedEmpty ( os );
 }
 PPXMLProteinHit::PPXMLProteinHit ( const string& aNum, vector <SearchResultsPeptideHit*>& th ) :
 	SearchResultsProteinHit ( new PPProteinHitInfo ( aNum ), aNum ),
@@ -3280,6 +3348,7 @@ string SearchResults::getMapTagHits ( MapIDMapAccNoAndVectorSearchResultsPeptide
 			spottingPlate = ProjectFile::getSpottingPlate ( pList );
 			fractionNames = ProjectFile::getFractionNameList ( pList );
 			numMSSpectra = ProjectFile::getNumMSSpectra ( pList );
+			if ( sresMods ) SiteScores::init ( pList );	// Initialise from list of used mods
 			rawTypes = ProjectFile::getRawTypes ( pList );
 			if ( rawTypes.empty () ) rawTypes.resize ( fractionNames.size () );
 			parentToleranceInfo = new ToleranceInfo ( "msms_parent_mass", pList );
@@ -3686,7 +3755,7 @@ void SearchResults::printCLinkProteinHitsDelimited ( ostream& os, int idx ) cons
 	if ( !cLinkProteinHits.empty () ) {
 		cLinkProteinHits [0]->printHeaderDelimited ( os, idx );
 		for ( int i = 0 ; i < cLinkProteinHits.size () ; i++ ) {
-			cLinkProteinHits [i]->printDelimited ( os );
+			cLinkProteinHits [i]->printDelimited ( os, linkInfo );
 		}
 	}
 }

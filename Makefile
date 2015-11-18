@@ -56,6 +56,7 @@ all:
 	make -C faindex -f faindex.linux.full.make $(APP_COMP_OPTIONS)
 	make -C jobStatus -f jobStatus.linux.make $(APP_COMP_OPTIONS)
 	make -C kill -f kill.linux.full.make $(APP_COMP_OPTIONS) PSILIB=$(PSILIB)
+	make -C makeParamDB -f make_param_db.linux.full.make $(APP_COMP_OPTIONS)
 	make -C msbatch -f msbatch.linux.make $(APP_COMP_OPTIONS)
 	make -C msdisplay -f msdisplay.linux.full.make $(APP_COMP_OPTIONS)
 	make -C msform -f msform.linux.full.make $(APP_COMP_OPTIONS)
@@ -76,6 +77,7 @@ allbasic:
 
 	make -C faindex -f faindex.linux.basic.make $(APP_COMP_OPTIONS)
 	make -C kill -f kill.linux.basic.make $(APP_COMP_OPTIONS) PSILIB=$(PSILIB)
+	make -C makeParamDB -f make_param_db.linux.basic.make $(APP_COMP_OPTIONS)
 	make -C msform -f msform.linux.basic.make $(APP_COMP_OPTIONS)
 	make -C mssearch -f mssearch.linux.basic.make $(APP_COMP_OPTIONS) LLIB=$(LLIB)
 
@@ -91,6 +93,7 @@ allcl:
 
 	make -C faindex -f faindex.linux.cl.make $(APP_COMP_OPTIONS)
 	make -C kill -f kill.linux.cl.make $(APP_COMP_OPTIONS) PSILIB=$(PSILIB)
+	make -C makeParamDB -f make_param_db.linux.cl.make $(APP_COMP_OPTIONS)
 	make -C msdisplay -f msdisplay.linux.cl.make $(APP_COMP_OPTIONS)
 	make -C msform -f msform.linux.cl.make $(APP_COMP_OPTIONS)
 	make -C mssearch -f mssearch.linux.cl.make $(APP_COMP_OPTIONS) LLIB=$(LLIB)
@@ -110,6 +113,7 @@ allclmpi:
 
 	make -C faindex -f faindex.linux.cl.make $(APP_COMP_OPTIONS)
 	make -C kill -f kill.linux.cl.make $(APP_COMP_OPTIONS) PSILIB=$(PSILIB)
+	make -C makeParamDB -f make_param_db.linux.cl.make $(APP_COMP_OPTIONS)
 	make -C msdisplay -f msdisplay.linux.cl.make $(APP_COMP_OPTIONS)
 	make -C msform -f msform.linux.cl.make $(APP_COMP_OPTIONS)
 	make -C mssearch -f mssearch.linux.cl.make $(APP_COMP_OPTIONS) LLIB=$(LLIB)
@@ -132,6 +136,7 @@ clean:
 	rm -rf faindex/*.o
 	rm -rf jobStatus/*.o
 	rm -rf kill/*.o
+	rm -rf makeParamDB/*.o
 	rm -rf msbatch/*.o
 	rm -rf msdisplay/*.o
 	rm -rf msform/*.o

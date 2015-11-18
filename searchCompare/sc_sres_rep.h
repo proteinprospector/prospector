@@ -26,6 +26,7 @@
 #include <limits>
 #include <vector>
 #include <lgen_define.h>
+#include <lu_ambiguity.h>
 #include <lu_species.h>
 #include <sc_search_res.h>
 #include <sc_sres_link.h>
@@ -72,6 +73,8 @@ public:
 	void setNumHomology ( int n ) { numHomology = n; }
 	void setIDStr ( const std::string& id ) { idStr.push_back ( id ); }
 	void printHTMLHeader ( std::ostream& os, const StringVector& searchNames, bool reportUniqPeps ) const;
+	void printHTMLHeader2 ( std::ostream& os, const StringVector& searchNames, bool reportUniqPeps ) const;
+	void printHTMLHeader3 ( std::ostream& os ) const;
 	void printHTML ( std::ostream& os, const SResLink& sresLink, const std::string& id, bool reportUniqPeps ) const;
 	void printDelimitedHeader ( std::ostream& os, bool ID, const StringVector& searchNames, bool reportUniqPeps ) const;
 	void printDelimited ( std::ostream& os, const std::string& id, bool reportUniqPeps ) const;
@@ -437,6 +440,7 @@ public:
 	}
 	int getRepeats ( int index ) const { return srph [index]->getPeptideHitInfo ()->getRepeats (); }
 	double getExpectationValue ( int index ) const { return srph [index]->getPeptideHitInfo ()->getExpectationValue (); }
+	double getMascotScore ( int index ) const { return srph [index]->getPeptideHitInfo ()->getMascotScore (); }
 	double getPeptideScore ( int i ) const { return srph [i]->getPeptideHitInfo ()->getScore (); }
 	double getDiscriminantScore ( int i ) const { return srph [i]->getDiscriminantScore (); }
 	double getPeptideError () const		// This function is only used when there is a single compared results file
@@ -452,16 +456,34 @@ public:
 	}
 	void printHTMLTimeHeader ( std::ostream& os, const StringVector& searchNames ) const;
 	void printHTMLHeader ( std::ostream& os, const StringVector& searchNames ) const;
+	void printHTMLHeader2 ( std::ostream& os, const StringVector& searchNames ) const;
+	void printHTMLHeader3 ( std::ostream& os ) const;
 	void printHTMLProteinHeader ( std::ostream& os, const StringVector& searchNames ) const;
 	void printHTML ( std::ostream& os, const SCMSTagLink& smtl, const std::string& id ) const;
+	void printHTML2 ( std::ostream& os, const SCMSTagLink& smtl, const std::string& id ) const;
+	void printHTML2 ( std::ostream& os, const SCMSTagLink& smtl, const std::string& id, int i ) const;
+	static void printHTMLEmpty ( std::ostream& os, int i );
 	void printHTML ( std::ostream& os, int pline, bool empty, bool aNumEmpty, const SCMSTagLink& smtl ) const;
 	void printHTMLProtein ( std::ostream& os, const StringVector& searchNames ) const;
 	void printDelimitedHeader ( std::ostream& os, const StringVector& searchNames, bool ID, bool reportUniqPeps ) const;
-	void printDelimited ( std::ostream& os, const std::string& idStr, int numHomology, const std::string& id, bool reportUniqPeps ) const;
+	void printDelimitedHeader2 ( std::ostream& os, bool ID, bool reportUniqPeps ) const;
+	void printDelimitedHeader3 ( std::ostream& os, const StringVector& searchNames ) const;
+	void printDelimitedHeader4 ( std::ostream& os ) const;
+	void printDelimitedHeader5 ( std::ostream& os, bool ID, bool reportUniqPeps ) const;
+	void printDelimitedHeader6 ( std::ostream& os ) const;
+	void printDelimitedHeader7 ( std::ostream& os ) const;
+	void printDelimited ( std::ostream& os, const std::string& idStr, int numHomology, const std::string& idStr2, bool reportUniqPeps ) const;
+	void printDelimited2 ( std::ostream& os, const std::string& idStr, int numHomology, const std::string& idStr2, bool reportUniqPeps ) const;
+	void printDelimited3 ( std::ostream& os, const std::string& idStr, int numHomology, const std::string& idStr2, bool reportUniqPeps ) const;
+	void printDelimited4 ( std::ostream& os ) const;
+	void printDelimited4 ( std::ostream& os, int i ) const;
+	void printDelimited5 ( std::ostream& os ) const;
+	void printDelimitedEmpty4 ( std::ostream& os, int i );
 	bool outputQuanResults ( std::ostream& os, const StringVector& searchNames, bool area ) const;
 	DoubleVectorVector getRatios ( bool area ) const;
 	static void setReportNumber ( bool f ) { reportNumber = f; }
 	static void setReportLinks ( bool f ) { reportLinks = f; }
+	void addSiteScores ( SiteScoresVector& siteScores, int line ) const;
 };
 typedef std::vector <SearchResultsPeptideLine*> SearchResultsPeptideLinePtrVector;
 typedef SearchResultsPeptideLinePtrVector::size_type SearchResultsPeptideLinePtrVectorSizeType;
@@ -923,6 +945,13 @@ class SearchResultsPeptideReport : public SearchResultsProteinReport {
 	void printMZIdentML_AnalysisCollection ( std::ostream& ost ) const;
 	void printMZIdentML_AnalysisProtocolCollection ( std::ostream& ost ) const;
 	void printMZIdentML_DataCollection ( std::ostream& ost ) const;
+	bool createMods ( MapStringToMapIntToSiteInfoVector& msmivpii, MapIntToMapStringToSiteInfoVector& mimssiv, int num ) const;
+	void printHTMLModsHeader ( std::ostream& os ) const;
+	void printHTMLModsRow ( std::ostream& os, const std::string& mod, int site, const SiteInfoVector& siv, const SCMSTagLink& smtl ) const;
+	void printHTMLMods ( std::ostream& os, int num, const SCMSTagLink& smtl ) const;
+	void printDelimitedModsRow ( std::ostream& os, const std::string& mod, int site, const SiteInfoVector& siv, const std::string& idStr, const std::string& idStr2, int numHomology ) const;
+	void printDelimitedMods ( std::ostream& os, int num, const std::string& idStr, int numHomology, const std::string& id, bool reportUniqPeps ) const;
+	int getBestSLIPIndex ( const SiteInfoVector& siv ) const;
 public:
 	SearchResultsPeptideReport ( const std::vector <SearchResults*>& sr, bool remove, const MapStringToStringVector& aNumList, const std::string& sortType, const std::string& sortType2, const std::string& reportHitsType, const std::string& reportHomologousProteins, const std::string& id );
 	SearchResultsPeptideReport ( const std::vector <SearchResults*>& sr, bool remove, const MapStringToStringVector& aNumList, const std::string& sortType, const std::string& sortType2, bool unmatchedSpectra, const std::string& reportHitsType, const std::string& reportHomologousProteins, const std::string& id, bool eraseNonUnique );

@@ -28,6 +28,10 @@
 #include <lg_io.h>
 #include <lg_string.h>
 #include <lu_ambiguity.h>
+#include <lu_delim.h>
+#include <lu_param_list.h>
+#include <lu_table.h>
+#include <lu_usermod.h>
 using std::set;
 using std::string;
 using std::vector;
@@ -56,16 +60,16 @@ public:
 		return a.second < b.second;
 	}
 };
-ModificationAmbiguity::ModificationAmbiguity ( const string& mods ) :
+ModificationAmbiguity::ModificationAmbiguity ( const string& mods, bool chopScores ) :
 	cur ( 0 )
 {
 	string ambiguity;
 	string unambiguity;
-	SCModInfo::getAmbiguityString ( mods, ambiguity, unambiguity );		// Gets an ambiguity string for passing to MS-Product
+	SCModInfo::getAmbiguityString ( mods, ambiguity, unambiguity, chopScores );		// Gets an ambiguity string for passing to MS-Product
 	if ( !ambiguity.empty () ) initAmbiguity ( ambiguity );
-	if ( !unambiguity.empty () ) initUnambiguity ( unambiguity );
+	if ( !unambiguity.empty () ) initUnambiguity ( unambiguity, chopScores );
 }
-void ModificationAmbiguity::initUnambiguity ( const string& unambiguity )
+void ModificationAmbiguity::initUnambiguity ( const string& unambiguity, bool chopScores )
 {
 	string::size_type idx1 = 0;
 	for ( ; ; ) {
@@ -75,6 +79,16 @@ void ModificationAmbiguity::initUnambiguity ( const string& unambiguity )
 		string::size_type idx3 = ms1.find ( '@' );
 		string mod = ms1.substr ( 0, idx3 );
 		string resStr = ms1.substr ( idx3+1 );
+		if ( !chopScores ) {
+			string::size_type idx4 = resStr.find ( '=' );
+			if ( idx4 != string::npos ) {
+				slip.push_back ( atoi ( resStr.substr ( idx4+1 ).c_str () ) );
+				resStr = resStr.substr ( 0, idx4 );		// Chop off the score element
+			}
+			else {
+				slip.push_back ( -1 );
+			}
+		}
 		int res;
 		if ( resStr == "N-term" )			res = -3;
 		else if ( resStr == "C-term" )		res = -2;
@@ -95,7 +109,7 @@ void ModificationAmbiguity::initAmbiguity ( const string& ambiguity )
 		string::size_type idx2 = ambiguity.find ( ';', idx1 );		// Find the first ';'
 		if ( idx2 == string::npos ) break;
 		string ms1 = ambiguity.substr ( idx1, idx2-idx1 );
-		std::vector <std::vector <PairStringInt> > vvpsi;
+		VectorVectorPairStringInt vvpsi;
 		string::size_type idx3 = 0;
 		for ( ; ; ) {
 			string::size_type idx4 = ms1.find ( "||", idx3 );					// Find the first "||"
@@ -121,7 +135,7 @@ int ModificationAmbiguity::getResidueIdx ( const string& resStr )
 	else if ( resStr == "Neutral loss" )return -1;
 	else								return atoi ( resStr.c_str () );
 }
-void ModificationAmbiguity::parseSimple ( std::vector <std::vector <PairStringInt> >& vvpsi, const string& ms1 )
+void ModificationAmbiguity::parseSimple ( VectorVectorPairStringInt& vvpsi, const string& ms1 )
 {
 	string::size_type idx3 = 0;
 	string mod;
@@ -159,15 +173,15 @@ void ModificationAmbiguity::parseSimple ( std::vector <std::vector <PairStringIn
 }
 // Eg
 // HexNAc&Phospho&Phospho@(17&13&(20|21|23|24|25|27|28))|(20&(9&24)|(13&(17|21|23|24|25|27|28)))|(21&13&(17|20|23|24|25|27|28))|(23&13&(17|20|21|24|25|27|28))|(25&13&(17|20|21|23|24|27|28))|(27&13&(17|20|21|23|24|25|28))|(28&13&(17|20|21|23|24|25|27))
-void ModificationAmbiguity::parseComplex ( std::vector <std::vector <PairStringInt> >& vvpsi, const string& ms1 )
+void ModificationAmbiguity::parseComplex ( VectorVectorPairStringInt& vvpsi, const string& ms1 )
 {
 	compPairs.clear ();
 	string::size_type idx3 = ms1.find ( "@(" );
-	string mods = ms1.substr ( 0, idx3 );
+	string mods = ms1.substr ( 0, idx3 );			// Extract HexNAc&Phospho&Phospho
 	string::size_type start = 0;
 	string::size_type end;
 	for ( ; ; ) {
-		string m = genNextString ( mods, "&", start, end );
+		string m = genNextString ( mods, "&", start, end );			// m is the mod ie HexNAC or Phospho
 		if ( end != string::npos )
 			compPairs.push_back ( make_pair ( m, 0 ) );
 		else {
@@ -175,11 +189,14 @@ void ModificationAmbiguity::parseComplex ( std::vector <std::vector <PairStringI
 			break;
 		}
 	}
-	complexVar = ms1.substr ( idx3+1 );
+	complexVar = ms1.substr ( idx3+1 );								// This is everything after the @ symbol
 	vIdx = 0;
 	parseNextComplex ( 0, vvpsi );
 }
-void ModificationAmbiguity::parseNextComplex ( int start, std::vector <std::vector <PairStringInt> >& vvpsi )
+// A compPair is a vector of a pair of a modification and a position. It thus represents a single modification state out of multiple possibilities.
+// vvpsi then represents a list of these modification state
+// vvvpsi is then a list of vvpsi
+void ModificationAmbiguity::parseNextComplex ( int start, VectorVectorPairStringInt& vvpsi )
 {
 	string s;
 	for ( int i = start ; ; ) {
@@ -213,7 +230,7 @@ void ModificationAmbiguity::parseNextComplex ( int start, std::vector <std::vect
 }
 void ModificationAmbiguity::getNextMod ( int level )
 {
-	std::vector <std::vector <PairStringInt> >& vvpsi = vvvpsi [level];
+	VectorVectorPairStringInt& vvpsi = vvvpsi [level];
 	for ( int i = 0 ; i < vvpsi.size () ; i++ ) {
 		vector <PairStringInt>& vpsi = vvpsi [i];
 		for ( int j = 0 ; j < vpsi.size () ; j++ ) {
@@ -298,6 +315,25 @@ bool ModificationAmbiguity::getNextSequence ( string& s, string& nTerm, string& 
 	s = t;
 	if ( amb ) cur++;
 	return cur < modArray.size ();
+}
+void ModificationAmbiguity::getUnambiguousIndexList ( const string& mod, IntVector& sites, IntVector& scores ) const
+{
+	for ( VectorPairStringIntSizeType i = 0 ; i < unambigMods.size () ; i++ ) {
+		if ( unambigMods [i].first == mod ) {
+			sites.push_back ( unambigMods [i].second );
+			scores.push_back ( slip [i] );
+		}
+	}
+	for ( VectorVectorVectorPairStringIntSizeType j = 0 ; j < vvvpsi.size () ; j++ ) {
+		for ( VectorVectorPairStringIntSizeType k = 0 ; k < vvvpsi [j].size () ; k++ ) {
+			for ( VectorPairStringIntSizeType l = 0 ; l < vvvpsi [j][k].size () ; l++ ) {
+				if ( vvvpsi [j][k][l].first == mod ) {
+					sites.push_back ( vvvpsi [j][k][l].second );
+					scores.push_back ( 0 );
+				}
+			}
+		}
+	}
 }
 
 //search # <map <pair <acc#, pair <mod, residue> >, pair <SpecID*, score>>>
@@ -608,7 +644,7 @@ string SCModInfo::getModsString ( int searchNumber, const SpecID* spID, const st
 //{
 //	return getAmbiguityString ( getModsString ( searchNumber, spID, dbPeptide ) );
 //}
-void SCModInfo::getAmbiguityString ( const string& modsString, string& ambString, string& unambString )		// Gets an ambiguity string for passing to MS-Product
+void SCModInfo::getAmbiguityString ( const string& modsString, string& ambString, string& unambString, bool chopScores )		// Gets an ambiguity string for passing to MS-Product
 {
 	ambString = "";
 	unambString = "";
@@ -622,8 +658,10 @@ void SCModInfo::getAmbiguityString ( const string& modsString, string& ambString
 		if ( end )	as = modsString.substr ( idx1 );				// Get each individual mod
 		else		as = modsString.substr ( idx1, idx2-idx1 );
 		if ( as.find ( '|' ) != string::npos || as.find ( '&' ) != string::npos ) amb = true;			// Is the mod ambiguous
-		string::size_type idx3 = as.find ( '=' );
-		if ( idx3 != string::npos ) as = as.substr ( 0, idx3 );		// Chop off the score element
+		if ( chopScores ) {
+			string::size_type idx3 = as.find ( '=' );
+			if ( idx3 != string::npos ) as = as.substr ( 0, idx3 );		// Chop off the score element
+		}
 		if ( amb )	ambString += as + ';';
 		else		unambString += as + ';';
 		if ( end ) break;
@@ -812,5 +850,205 @@ void ProbabilityAmbiguity::getNext ( int level )
 		}
 		else hits.push_back ( sequence );
 		sequence.pop_back ();
+	}
+}
+bool SiteInfo::getIndex ( int& idx ) const
+{
+	if ( index == -2 ) return false;
+	else {
+		idx = index;
+		return true;
+	}
+}
+void SiteInfo::printHTMLHeaderSLIP ( ostream& os, int idx, int rowspan )
+{
+	string header = "SLIP";
+	if ( idx != -1 ) header += " " + gen_itoa ( idx+1 );
+	tableHeader ( os, header, "", "", true, 0, rowspan );
+}
+void SiteInfo::printHTMLSLIP ( ostream& os ) const
+{
+	if ( slip == -2 ) {
+		tableEmptyCell ( os );						// no match
+	}
+	else {
+		if ( slip == -1 )	tableCell ( os, "-" );	// no ambiguity
+		else				tableCell ( os, slip );	// slip
+	}
+}
+bool SiteInfo::printHTMLAA ( ostream& os ) const
+{
+	if ( index == -2 ) return false;
+	else {
+		tableCell ( os, aa, true );
+		return true;
+	}
+}
+void SiteInfo::printDelimitedHeaderSLIP ( ostream& os, int idx )
+{
+	string header = "SLIP";
+	if ( idx != -1 ) header += " " + gen_itoa ( idx+1 );
+	delimitedHeader ( os, header );
+}
+void SiteInfo::printDelimitedSLIP ( ostream& os ) const
+{
+	if ( slip == -2 ) {
+		delimitedEmptyCell ( os );
+	}
+	else {
+		if ( slip == -1 )	delimitedCell ( os, "-" );	// no ambiguity
+		else				delimitedCell ( os, slip );	// slip
+	}
+}
+bool SiteInfo::printDelimitedAA ( ostream& os ) const
+{
+	if ( index == -2 ) return false;
+	else {
+		delimitedCell ( os, aa );
+		return true;
+	}
+}
+
+class SiteInfoAscending {
+public:
+	bool operator () ( const SiteInfo& a, const SiteInfo& b ) const
+	{
+		return a.site < b.site;
+	}
+};
+
+class GlycoSiteInfoAscending {
+public:
+	bool operator () ( const GlycoSiteInfo& a, const GlycoSiteInfo& b ) const
+	{
+		if ( a.site == b.site )
+			return a.mod < b.mod;
+		else
+			return a.site < b.site;
+	}
+};
+
+SetString SiteScores::glycoMods;
+MapStringToMapCharToInt SiteScores::msmci;
+int SiteScores::idx = 0;
+bool SiteScores::initialised = false;
+
+SiteScores::SiteScores ()
+{
+	siteScores.resize ( idx );
+}
+void SiteScores::initMod ( const string& mod, char aa )
+{
+	MapStringToMapCharToIntConstIterator cur1 = msmci.find ( mod );
+	if ( cur1 != msmci.end () ) {									// mod exists
+		const MapCharToInt& mci = (*cur1).second;
+		MapCharToIntConstIterator cur2 = mci.find ( aa );
+		if ( cur2 != mci.end () ) {									// aa exists
+			return;
+		}
+	}
+	msmci [mod][aa] = idx++;
+}
+void SiteScores::init ( const ParameterList* pList )
+{
+	StringVector mods = pList->getStringVectorValue ( "msms_mod_AA" );
+	init ( mods );
+}
+void SiteScores::init ( const StringVector& mods, bool flag )
+{
+	if ( mods.empty () ) return;
+	for ( StringVectorSizeType i = 0 ; i < mods.size () ; i++ ) {
+		string u = mods [i];
+		int pos = u.rfind ( '(' );
+		string aa = u.substr ( pos+1, u.length()-pos-2 );
+		string outputString = u.substr ( 0, pos-1 );
+		if ( aa != "N-term" && aa != "C-term" && aa != "Neutral loss" ) {
+			initMod ( outputString, aa [0] );
+		}
+		if ( Usermod::isGlyco ( outputString ) ) glycoMods.insert ( outputString );
+	}
+	initialised = true;
+}
+void SiteScores::init ( const StringVector& mods )
+{
+	if ( initialised == true ) return;
+	for ( StringVectorSizeType i = 0 ; i < mods.size () ; i++ ) {
+		string u = mods [i];
+		if ( !u.empty () && u [u.length ()-1] != ')' ) {
+			int exIdx = u.find_last_of ( ")" );
+			u = u.substr ( 0, exIdx + 1 );
+		}
+		Usermod umod ( u );
+		string aaList = umod.getAAList ();
+		string outputString = umod.getOutputString ();
+		for ( int j = 0 ; j < aaList.length () ; j++ ) {
+			char c = aaList [j];
+			if ( isupper ( c ) ) initMod ( outputString, c );
+		}
+		if ( Usermod::isGlyco ( outputString ) ) glycoMods.insert ( outputString );
+	}
+}
+void SiteScores::add ( const string& peptide, const string& mods, int start, int index )
+{
+	ModificationAmbiguity ma ( mods, false );
+	for ( MapStringToMapCharToIntConstIterator i = msmci.begin () ; i != msmci.end () ; i++ ) {
+		IntVector sites, scores;
+		ma.getUnambiguousIndexList ( (*i).first, sites, scores );
+		const MapCharToInt& mci = (*i).second;
+		for ( int j = 0 ; j < scores.size () ; j++ ) {
+			int site = sites [j];
+			char aa = peptide [site-start];
+			MapCharToIntConstIterator cur2 = mci.find ( aa );
+			if ( cur2 != mci.end () ) {
+				int ssIdx = (*cur2).second;
+				int score = scores [j];
+				MapIntToPairIntIntIterator cur = siteScores [ssIdx].find ( site );
+				if ( cur == siteScores [ssIdx].end () ) {
+					siteScores [ssIdx][site] = make_pair ( score, index );
+				}
+				else if ( score > (*cur).second.first ) {
+					(*cur).second.first = score;
+					(*cur).second.second = index;
+				}
+			}
+		}
+	}
+}
+void SiteScores::clear ()
+{
+	for ( int i = 0 ; i < siteScores.size () ; i++ ) {
+		siteScores [i].clear ();
+	}
+}
+void SiteScores::getSiteInfo ( StringVector& vModString, SiteInfoVectorVector& vvSiteInfo, GlycoSiteInfoVector& vGlycoSiteInfo ) const
+{
+	for ( MapStringToMapCharToIntConstIterator i = msmci.begin () ; i != msmci.end () ; i++ ) {
+		string modString = (*i).first;
+		bool glycoModFlag = glycoMods.find ( modString ) != glycoMods.end ();
+		const MapCharToInt& mci = (*i).second;
+		SiteInfoVector vSiteInfo;
+		for ( MapCharToIntConstIterator j = mci.begin () ; j != mci.end () ; j++ ) {
+			char aa = (*j).first;
+			int idx = (*j).second;
+			for ( MapIntToPairIntIntConstIterator k = siteScores [idx].begin () ; k != siteScores [idx].end () ; k++ ) {
+				int site = (*k).first;
+				int slip = (*k).second.first;
+				int index = (*k).second.second;
+				if ( slip ) {
+					if ( glycoModFlag )
+						vGlycoSiteInfo.push_back ( GlycoSiteInfo ( site, aa, slip, index, modString ) );	// Don't use ambiguous sites
+					else
+						vSiteInfo.push_back ( SiteInfo ( site, aa, slip, index ) );							// Don't use ambiguous sites
+				}
+			}
+		}
+		if ( !glycoModFlag ) {	// Not a glyco mod
+			stable_sort ( vSiteInfo.begin (), vSiteInfo.end (), SiteInfoAscending () );
+			vModString.push_back ( modString );
+			vvSiteInfo.push_back ( vSiteInfo );
+		}
+	}
+	if ( !vGlycoSiteInfo.empty () ) {
+		stable_sort ( vGlycoSiteInfo.begin (), vGlycoSiteInfo.end (), GlycoSiteInfoAscending () );
 	}
 }

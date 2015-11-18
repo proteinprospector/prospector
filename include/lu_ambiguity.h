@@ -26,27 +26,29 @@
 #include <lgen_define.h>
 
 class ModificationAmbiguity {
-	std::vector <std::vector <std::vector <PairStringInt> > > vvvpsi;
-	std::vector <std::vector <PairStringInt> > modArray;
-	std::vector <PairStringInt> curMod;
-	std::vector <PairStringInt> unambigMods;
+	VectorVectorVectorPairStringInt vvvpsi;	// A element in vvpsi is a single modification state (ie the mods and their positions)
+	VectorVectorPairStringInt modArray;
+	VectorPairStringInt curMod;
+	VectorPairStringInt unambigMods;
+	IntVector slip;
 	mutable int cur;
-	void initUnambiguity ( const std::string& unambiguity );
+	void initUnambiguity ( const std::string& unambiguity, bool chopScores );
 	void initAmbiguity ( const std::string& ambiguity );
-	void parseSimple ( std::vector <std::vector <PairStringInt> >& vvpsi, const std::string& ms1 );
-	void parseComplex ( std::vector <std::vector <PairStringInt> >& vvpsi, const std::string& ms1 );
+	void parseSimple ( VectorVectorPairStringInt& vvpsi, const std::string& ms1 );
+	void parseComplex ( VectorVectorPairStringInt& vvpsi, const std::string& ms1 );
 	void getNextMod ( int level );
 
 	StringVector mNames;
 	std::string complexVar;
 	int vIdx;
-	std::vector <PairStringInt> compPairs;
-	void parseNextComplex ( int start, std::vector <std::vector <PairStringInt> >& vvpsi );
+	VectorPairStringInt compPairs;
+	void parseNextComplex ( int start, VectorVectorPairStringInt& vvpsi );
 
 	static int getResidueIdx ( const std::string& resStr );
 public:
-	ModificationAmbiguity ( const std::string& mods );
+	ModificationAmbiguity ( const std::string& mods, bool chopScores = true );
 	bool getNextSequence ( std::string& s, std::string& nTerm, std::string& cTerm, std::string& nLoss ) const;
+	void getUnambiguousIndexList ( const std::string& mod, IntVector& sites, IntVector& scores ) const;
 };
 
 class SpecID;
@@ -114,7 +116,7 @@ public:
 	static void init ( int searchNumber, const StringVector& constMods, double threshold );
 	//static std::string getAmbiguityString ( int searchNumber, const SpecID* spID, const std::string& dbPeptide );
 	//static std::string getAmbiguityString ( const std::string& modsString );
-	static void getAmbiguityString ( const std::string& modsString, std::string& ambString, std::string& unambString );	// Gets an ambiguity string for passing to MS-Product
+	static void getAmbiguityString ( const std::string& modsString, std::string& ambString, std::string& unambString, bool chopScores = true );	// Gets an ambiguity string for passing to MS-Product
 };
 class ProbabilityAmbiguity {
 	IntVector siteList;
@@ -128,5 +130,79 @@ public:
 	ProbabilityAmbiguity ( const std::string& probStr, const std::string& mod, double probLimit );
 	std::string getModStr () const { return modStr; }
 };
+
+struct SiteInfo {
+	int site;
+	char aa;
+	int slip;
+	int index;
+	SiteInfo () :
+		slip ( -2 ),
+		index ( -2 ) {}
+	SiteInfo ( int site, char aa, int slip, int index ) :
+		site ( site ),
+		aa ( aa ),
+		slip ( slip ),
+		index ( index ) {}
+
+	bool getIndex ( int& idx ) const;
+
+	static void printDelimitedHeaderSLIP ( std::ostream& os, int idx );
+	void printDelimitedSLIP ( std::ostream& os ) const;
+	bool printDelimitedAA ( std::ostream& os ) const;
+	static void printHTMLHeaderSLIP ( std::ostream& os, int idx, int rowspan );
+	void printHTMLSLIP ( std::ostream& os ) const;
+	bool printHTMLAA ( std::ostream& os ) const;
+};
+
+struct GlycoSiteInfo : public SiteInfo {
+	std::string mod;
+	GlycoSiteInfo ( int site, char aa, int slip, int index, const std::string& mod ) :
+		SiteInfo ( site, aa, slip, index ),
+		mod ( mod ) {}
+};
+
+typedef std::vector <SiteInfo> SiteInfoVector;
+typedef std::vector <SiteInfoVector> SiteInfoVectorVector;
+
+typedef std::vector <GlycoSiteInfo> GlycoSiteInfoVector;
+
+class ParameterList;
+
+class SiteScores {
+protected:
+	static SetString glycoMods;
+	static MapStringToMapCharToInt msmci;
+	static int idx;
+	static bool initialised;
+	VectorMapIntToPairIntInt siteScores;
+public:
+	SiteScores ();
+	static void init ( const ParameterList* pList );
+	static void init ( const StringVector& mods, bool flag );
+	static void init ( const StringVector& mods );
+	static void initMod ( const std::string& mod, char aa );
+	void add ( const std::string& peptide, const std::string& mods, int start, int index );
+	void clear ();
+	void getSiteInfo ( StringVector& vModString, SiteInfoVectorVector& vvSiteInfo, GlycoSiteInfoVector& vGlycoSiteInfo ) const;
+};
+
+typedef std::vector <SiteScores> SiteScoresVector;
+
+typedef std::map <int, SiteInfoVector> MapIntToSiteInfoVector;
+typedef MapIntToSiteInfoVector::iterator MapIntToSiteInfoVectorIterator;
+typedef MapIntToSiteInfoVector::const_iterator MapIntToSiteInfoVectorConstIterator;
+
+typedef std::map <std::string, MapIntToSiteInfoVector> MapStringToMapIntToSiteInfoVector;
+typedef MapStringToMapIntToSiteInfoVector::iterator MapStringToMapIntToSiteInfoVectorIterator;
+typedef MapStringToMapIntToSiteInfoVector::const_iterator MapStringToMapIntToSiteInfoVectorConstIterator;
+
+typedef std::map <std::string, SiteInfoVector> MapStringToSiteInfoVector;
+typedef MapStringToSiteInfoVector::iterator MapStringToSiteInfoVectorIterator;
+typedef MapStringToSiteInfoVector::const_iterator MapStringToSiteInfoVectorConstIterator;
+
+typedef std::map <int, MapStringToSiteInfoVector> MapIntToMapStringToSiteInfoVector;
+typedef MapIntToMapStringToSiteInfoVector::iterator MapIntToMapStringToSiteInfoVectorIterator;
+typedef MapIntToMapStringToSiteInfoVector::const_iterator MapIntToMapStringToSiteInfoVectorConstIterator;
 
 #endif /* ! __lu_ambiguity_h */

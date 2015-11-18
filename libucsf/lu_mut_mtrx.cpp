@@ -46,24 +46,26 @@ using std::remove_if;
 using std::cout;
 using std::make_pair;
 using std::fill;
+using std::vector;
+using std::make_pair;
+using std::endl;
 
 typedef ModificationVector::size_type ModificationVectorSizeType;
 
 class MultiModification {
-	CharVector expectedResidues;
+	ModificationVector mod;
 	CharVector modifiedResidues;
-	CharVector terminalSpecificities;
 	ExtraModVector extraMods;
 	double massShift;
 	friend class sort_multi_modifications;
 public:
 	MultiModification ( const ModificationVector& mods );
 	double getMassShift () const { return massShift; }
-	const CharVector& getExpectedResidues () const { return expectedResidues; }
+	const ModificationVector& getModifications () const { return mod; }
 	const CharVector& getModifiedResidues () const { return modifiedResidues; }
-	const CharVector& getTerminalSpecificities () const { return terminalSpecificities; }
 	const ExtraModVector& getExtraMods () const { return extraMods; }
 	bool isExtraMods () const { return !extraMods.empty (); }
+	ModificationVectorSizeType size () const { return mod.size (); }
 };
 
 typedef MultiModificationVector::const_iterator MultiModificationVectorConstIterator;
@@ -74,19 +76,22 @@ struct ExtraMod {
 	double mass;
 	MassType multiplierMass;
 	bool mmod;
-	ExtraMod ( char type, double mass, const string& name, bool mmod = false ) :
+	Motif* motif;
+	ExtraMod ( char type, double mass, const string& name, bool mmod = false, Motif* motif = 0 ) :
 		type ( type ),
 		mass ( mass ),
 		name ( name ),
-		mmod ( mmod )
+		mmod ( mmod ),
+		motif ( motif )
 	{
 		if ( type == 'n' )		this->mass += h1;
 		else if ( type == 'c' )	this->mass += o_h;
 		multiplierMass = static_cast <MassType> ( this->mass * MASS_TYPE_MULTIPLIER );
 	}
-	ExtraMod ( char type, const string& nm, double m ) :
+	ExtraMod ( char type, const string& nm, double m, Motif* motif = 0 ) :
 		type ( type ),
-		mmod ( true )
+		mmod ( true ),
+		motif ( motif )
 	{
 		mass = m;
 		if ( type == 'n' ) {
@@ -113,6 +118,16 @@ struct ExtraMod {
 			else
 				return gen_ftoa ( atof ( name.c_str () ) + err, "%.4f" );
 		}
+	}
+	bool getOn () const
+	{
+		if ( !motif ) return true;
+		else return motif->getOn ();
+	}
+	bool getOn ( int site ) const
+	{
+		if ( !motif ) return true;
+		else return motif->getOn ( site );
 	}
 };
 typedef ExtraModVector::size_type ExtraModVectorSizeType;
@@ -560,7 +575,54 @@ void PeptideSequence::addConstMod ( char aa, const string& mod )
 	else							s = string ( 1, aa ) + "(" + mod + ")";
 	cMods [aa] = s;
 }
-Modification::Modification ( char expectedResidue, char modifiedResidue, char terminalSpecificity ) :
+Motif::Motif ( const string& motif, int offset ) :
+	motif ( motif ),
+	offset ( offset ),
+	re ( new RegularExpression ( motif ) ),
+	on ( false )
+{
+	static int num = 0;
+	num++;
+}
+Motif::~Motif ()
+{
+	delete re;
+}
+void Motif::setSites ( const char* frame )
+{
+	sites.clear ();
+	while ( re->isPresentMultiOverlap ( frame ) ) {
+		sites.push_back ( re->getStartAA () + offset );
+	}
+	startIndex = 0;
+}
+void Motif::setFlag ( int startAA, int endAA )
+{
+	on = false;
+	stAA = startAA;
+	for ( int i = startIndex ; i < sites.size () ; i++ ) {
+		int site = sites [i];
+		if ( site < startAA ) startIndex++;
+		else if ( site > endAA ) break;
+		else {
+			on = true;
+			return;
+		}
+	}
+}
+bool Motif::getOn ( int s ) const
+{
+	int actualSite = stAA + s;
+	for ( int i = startIndex ; i < sites.size () ; i++ ) {
+		int site = sites [i];
+		if ( site == actualSite ) return true;
+		if ( site > actualSite ) return false;
+	}
+	return false;
+}
+bool Modification::singleLetterMotifFlag = false;
+MotifMap Modification::motifMap;
+Modification::Modification ( char expectedResidue, char modifiedResidue, char terminalSpecificity, Motif* motif ) :
 	expectedResidue ( expectedResidue ),
 	modifiedResidue ( modifiedResidue ),
 	terminalSpecificity ( terminalSpecificity ),
@@ -568,8 +630,12 @@ Modification::Modification ( char expectedResidue, char modifiedResidue, char te
 	massShift ( amino_acid_wt [modifiedResidue] - amino_acid_wt [expectedResidue] ),
 	mmod ( false )
 {
+	if ( motif != 0 ) {
+		singleLetterMotifFlag = true;
+		motifMap [modifiedResidue] = motif;
+	}
 }
-Modification::Modification ( const string& modAminoAcid, char terminalSpecificity ) :
+Modification::Modification ( const string& modAminoAcid, char terminalSpecificity, Motif* motif ) :
 	expectedResidue ( modAminoAcid [0] ),
 	modifiedResidue ( 'u' ),
 	terminalSpecificity ( terminalSpecificity ),
@@ -593,10 +659,10 @@ Modification::Modification ( const string& modAminoAcid, char terminalSpecificit
 	else {
 		modifyAAInfo ( 'u', modAminoAcid );
 		massShift = amino_acid_wt ['u'] - amino_acid_wt [expectedResidue];
-		extraMod = new ExtraMod ( 'u', massShift, modAminoAcid );
+		extraMod = new ExtraMod ( 'u', massShift, modAminoAcid, false, motif );
 	}
 }
-Modification::Modification ( const string& modAminoAcid, double massShift, char terminalSpecificity, bool mmod ) :
+Modification::Modification ( const string& modAminoAcid, double massShift, char terminalSpecificity, bool mmod, Motif* motif ) :
 	expectedResidue ( modAminoAcid [0] ),
 	terminalSpecificity ( terminalSpecificity ),
 	massShift ( massShift ),
@@ -616,12 +682,34 @@ Modification::Modification ( const string& modAminoAcid, double massShift, char 
 	}
 	else {
 		modifiedResidue = 'u';
-		extraMod = new ExtraMod ( 'u', massShift, modAminoAcid, mmod );
+		extraMod = new ExtraMod ( 'u', massShift, modAminoAcid, mmod, motif );
 	}
 }
 Modification::~Modification ()
 {
 	delete extraMod;
+}
+bool Modification::getOn () const
+{
+	if ( extraMod ) return extraMod->getOn ();
+	if ( singleLetterMotifFlag ) {
+		MotifMapConstIterator cur = motifMap.find ( modifiedResidue );
+		if ( cur != motifMap.end () ) {
+			return (*cur).second->getOn ();
+		}
+	}
+	return true;
+}
+bool Modification::getOn ( int site ) const
+{
+	if ( extraMod ) return extraMod->getOn ( site );
+	if ( singleLetterMotifFlag ) {
+		MotifMapConstIterator cur = motifMap.find ( modifiedResidue );
+		if ( cur != motifMap.end () ) {
+			return (*cur).second->getOn ( site );
+		}
+	}
+	return true;
 }
 bool Modification::getCation () const
 {
@@ -637,6 +725,25 @@ bool Modification::getDehydro () const
 {
 	if ( extraMod )	return extraMod->name.find ( "Dehydro" ) != string::npos;
 	else			return false;
+}
+string Modification::getModification () const
+{
+	string s;
+	if ( extraMod ) {
+		if ( expectedResidue == 'n' ) s += "N-term(";
+		if ( expectedResidue == 'c' ) s += "C-term(";
+		if ( expectedResidue == '.' ) s += "Neutral-loss(";
+		s += extraMod->name;
+		if ( expectedResidue == 'n' || expectedResidue == 'c' || expectedResidue == '.' ) s += ")";
+	}
+	else {
+		s += expectedResidue;
+		s += '(';
+		if ( modifiedResidue == 'm' ) s += "Oxidation";
+		if ( modifiedResidue == 's' || modifiedResidue == 't' || modifiedResidue == 'y' ) s += "Phospho";
+		s += ')';
+	}
+	return s;
 }
 class sort_modifications {
 public:
@@ -666,7 +773,7 @@ MultiModification::MultiModification ( const ModificationVector& mods )
 	char curMod = 'u';
 	int terms = 0;
 	for ( ModificationVectorSizeType i = 0 ; i < mods.size () ; i++ ) {
-		expectedResidues.push_back ( mods [i]->getExpectedResidue () );
+		mod.push_back ( mods [i] );
 		char mod = mods [i]->getModifiedResidue ();
 		ExtraMod* em = mods [i]->getExtraMod ();
 		if ( mod == 'u' ) {
@@ -687,7 +794,6 @@ MultiModification::MultiModification ( const ModificationVector& mods )
 		}
 		else
 			modifiedResidues.push_back ( mod );
-		terminalSpecificities.push_back ( mods [i]->getTerminalSpecificity () );
 		massShift += mods [i]->getMassShift ();
 	}
 }
@@ -709,10 +815,26 @@ ModificationParameters::ModificationParameters ( const ParameterList* params, co
 	modCTermProtein		( params->getStringValue		( "mod_c_term_type", "Peptide" ) == "Protein" ),
 	modCTerm			( params->getBoolValue			( "mod_c_term", false ) ),
 	modNeutralLoss		( params->getBoolValue			( "mod_neutral_loss", false ) ),
+	modRare				( params->getBoolValue			( "mod_rare", false ) ),
 	modRangeType		( params->getStringValue		( "mod_range_type", "Da" ) ),
 	modMaxZ				( params->getIntValue			( "mod_max_z", 1 ) )
 {
+	setModMotifs ( params );
 	ExtraUserMods::instance ().addUserMods2 ( params, ExtraUserModsForm::getNumUserMods () );
+}
+void ModificationParameters::setModMotifs ( const ParameterList* params )
+{
+	for ( int i = 1 ; i <= MassModificationForm::getNumMotifs () ; i++ ) {
+		string anum = gen_itoa ( i );
+		string aa		= params->getStringValue ( "mod_motif_aa_"		+ anum );
+		string offset	= params->getStringValue ( "mod_motif_offset_"	+ anum, "Off" );
+		string motif	= params->getStringValue ( "mod_motif_"			+ anum );
+		if ( offset != "Off" && !motif.empty () ) {
+			modMotifAA.push_back ( aa );
+			modMotifOffset.push_back ( atoi ( offset.c_str () ) );
+			modMotif.push_back ( motif );
+		}
+	}
 }
 void ModificationParameters::printHTML ( ostream& os ) const
 {
@@ -747,6 +869,56 @@ public:
 		else		return false;
 	}
 };
+class CheckLabelMod {
+	VectorModificationSet labelMods;
+	MapModificationPtrInt labelModsMap;
+public:
+	CheckLabelMod ( const VectorModificationSet labelMods, const MapModificationPtrInt& labelModsMap ) :
+		labelMods ( labelMods ),
+		labelModsMap ( labelModsMap ) {}
+	bool operator () ( Modification* m )
+	{
+		MapModificationPtrIntConstIterator cur = labelModsMap.find ( m );					// Find the modification
+		if ( cur != labelModsMap.end () ) {													// If the modification is labelled
+			int labNum = (*cur).second - 1;													// Get the label number
+			bool cTerm = false;
+			bool nTerm = false;
+			for ( ModificationSetConstIterator j = labelMods [labNum].begin () ; j != labelMods [labNum].end () ; j++ ) {
+				Modification* mp = *j;
+				if ( mp->getCTerm () ) cTerm = true;
+				if ( mp->getNTerm () ) nTerm = true;
+			}
+			if ( nTerm && !m->getNTerm () ) return true;
+			if ( cTerm && !m->getCTerm () ) return true;
+		}
+		return false;
+	}
+	bool operator () ( MultiModification* m )
+	{
+		const ModificationVector& mv = m->getModifications ();
+		int labNum = -1;
+		bool modCTerm = false;
+		bool modNTerm = false;
+		bool labCTerm = false;
+		bool labNTerm = false;
+		for ( ModificationVectorSizeType i = 0 ; i < mv.size () ; i++ ) {
+			MapModificationPtrIntConstIterator cur = labelModsMap.find ( mv [i] );			// Find the modification
+			if ( cur != labelModsMap.end () ) {												// If the modification is labelled
+				labNum = (*cur).second - 1;													// Get the label number
+				if ( mv [i]->getNTerm () ) modNTerm = true;
+				if ( mv [i]->getCTerm () ) modCTerm = true;
+				for ( ModificationSetConstIterator j = labelMods [labNum].begin () ; j != labelMods [labNum].end () ; j++ ) {
+					Modification* mp = *j;
+					if ( mp->getCTerm () ) labCTerm = true;									// This procedure labels the C-terminus
+					if ( mp->getNTerm () ) labNTerm = true;									// This procedure labels the N-terminus
+				}
+			}
+		}
+		if ( labCTerm && !modCTerm ) return true;
+		if ( labNTerm && !modNTerm ) return true;
+		return false;
+	}
+};
 
 unsigned int ModificationTable::MAX_MODIFICATIONS = 12000000;
 bool ModificationTable::modMapInitialised = false;
@@ -772,12 +944,18 @@ ModificationTable::ModificationTable ( const ModificationParameters& modificatio
 	initialiseMassOffsetModifications ( modificationParameters );
 	sort ( modifications.begin (), modifications.end (), sort_modifications () );
 	rare = rareMods.empty () ? 0 : 1;
+	modRare = modificationParameters.getModRare ();
+
 	maxCh = !maxMods.empty ();
+
+	label = !labelMods.empty ();
+
 	if ( maxLevels > 1 ) {
 		initialiseHomologyMultiMod ();
 	}
 	int i = remove_if ( modifications.begin (), modifications.end (), CheckMod ( "Dehydro" ) ) - modifications.begin ();	// Dehydros only occur in pairs
 	modifications.erase ( modifications.begin () + i, modifications.end () );
+	if ( label ) checkLabelMods ();
 	if ( !modifications.empty () ) {
 		mostNegMassShift = modifications.front ()->getMassShift ();
 		mostPosMassShift = modifications.back ()->getMassShift ();
@@ -788,6 +966,7 @@ ModificationTable::ModificationTable ( const ModificationParameters& modificatio
 	}
 	maxParentError = genMax ( - mostNegMassShift, mostPosMassShift );
 	ujm.deletePreviousMessage ( cout );
+	//printModificationCombinations ( cout );
 }
 ModificationTable::~ModificationTable ()
 {
@@ -797,6 +976,30 @@ ModificationTable::~ModificationTable ()
 	for ( ModificationVectorSizeType j = 0 ; j < modifications.size () ; j++ ) {
 		delete modifications [j];
 	}
+}
+void ModificationTable::printModificationCombinations ( ostream& os ) const
+{
+	for ( int i = 0 ; i < modifications.size () ; i++ ) {
+		os << modifications [i]->getModification () << "<br />" << endl; 
+	}
+	for ( int j = 0 ; j < multiModifications.size () ; j++ ) {
+		MultiModification* mm = multiModifications [j];
+		const ModificationVector& mv = mm->getModifications ();
+		for ( int k = 0 ; k < mv.size () ; k++ ) {
+			os << mv [k]->getModification () << " " << endl; 
+		}
+		os << "<br />" << endl; 
+	}
+}
+void ModificationTable::checkLabelMods ()
+{
+	int i = remove_if ( modifications.begin (), modifications.end (), CheckLabelMod ( labelMods, labelModsMap ) ) - modifications.begin ();
+	modifications.erase ( modifications.begin () + i, modifications.end () );					// If a labelling procedure labels the N-terminus then singly
+																								// modified residues are not allowed
+
+	int j = remove_if ( multiModifications.begin (), multiModifications.end (), CheckLabelMod ( labelMods, labelModsMap ) ) - multiModifications.begin ();
+	multiModifications.erase ( multiModifications.begin () + j, multiModifications.end () );	// If a labelling procedure labels the N-terminus then modified 
+																								// residues are not allowed unless the N-terminus is modified
 }
 ModificationPair ModificationTable::getPossibleModifications ( double startMass, double endMass )
 {
@@ -847,31 +1050,33 @@ bool ModificationTable::getMutatedSequences ( double startMass, double endMass, 
 			pepLen = peptide.length ();
 			for ( ModificationVectorConstIterator mi = modIter ; mi != modifications.end () ; mi++ ) {
 				if ( (*mi)->getMassShift () > endMass ) break;
-				ExtraModVector mal;
+				bool on = (*mi)->getOn ();
+				if ( !on ) continue;		// No matching motifs for this mod in the peptide
+				extraMods.clear ();
 				char expectedAA = (*mi)->getExpectedResidue ();
 				char terminalSpecificity = (*mi)->getTerminalSpecificity ();
 				ExtraMod* extraMod = (*mi)->getExtraMod ();
-				if ( extraMod ) mal.push_back ( extraMod );
+				if ( extraMod ) extraMods.push_back ( extraMod );
 				if ( expectedAA == '.' ) {			// Neutral loss
 					if ( z != 0 && extraMod->mmod ) {
 						double mz = (*mi)->getMassShift () / z;
 						if ( mz >= mmodStartExact && mz <= mmodEndExact ) {
-							sequenceList.push_back ( PeptideSequence ( newPeptide, mal ) );
+							addSequence ( sequenceList, *mi );
 						}
 					}
 					else
-						sequenceList.push_back ( PeptideSequence ( newPeptide, mal ) );
+						addSequence ( sequenceList, *mi );
 				}
 				else if ( expectedAA == 'n' ) {		// Used for the case of a modified terminal group when you don't
 													// care about the amino acid at the terminus.
 					if ( terminalSpecificity != 'n' || nTermPeptide ) {		// Covers the case of acetylation
-						sequenceList.push_back ( PeptideSequence ( newPeptide, mal ) );
+						addSequence ( sequenceList, *mi );
 					}
 				}
 				else if ( expectedAA == 'c' ) {		// Used for the case of a modified terminal group when you don't
 													// care about the amino acid at the terminus.
 					if ( terminalSpecificity != 'c' || cTermPeptide ) {
-						sequenceList.push_back ( PeptideSequence ( newPeptide, mal ) );
+						addSequence ( sequenceList, *mi );
 					}
 				}
 				else {
@@ -894,9 +1099,9 @@ bool ModificationTable::getMutatedSequences ( double startMass, double endMass, 
 						}
 					}
 					for ( int j = startJ ; j < endJ ; j++ ) {
-						if ( expectedAA == newPeptide [j] ) {
+						if ( expectedAA == newPeptide [j] && (*mi)->getOn ( j ) ) {
 							newPeptide [j] = modificationAA;
-							sequenceList.push_back ( PeptideSequence ( newPeptide, mal ) );
+							addSequence ( sequenceList, *mi );
 							if ( maxSequences && sequenceList.size () > maxSequences ) return false;
 							newPeptide [j] = expectedAA; // restores to original sequence
 						}
@@ -935,21 +1140,23 @@ void ModificationTable::addMultiMutatedSequences ( double startMass, double endM
 			pepLen = peptide.length ();
 			for ( MultiModificationVectorConstIterator mmi = mModIter ; mmi != multiModifications.end () ; mmi++ ) {
 				if ( (*mmi)->getMassShift () > endMass ) break;
-				numModResidues = (*mmi)->getExpectedResidues ().size ();
+				numModResidues = (*mmi)->size ();
 				sequenceSet.clear ();
 				if ( (*mmi)->isExtraMods () )
 					extraMods = (*mmi)->getExtraMods ();
 				else
 					extraMods.clear ();
-				getNextModification ( 0, (*mmi)->getExpectedResidues (), (*mmi)->getModifiedResidues (), (*mmi)->getTerminalSpecificities (), peptide, nTermPeptide, cTermPeptide, sequenceList, z );
+				getNextModification ( 0, (*mmi)->getModifications (), (*mmi)->getModifiedResidues (), peptide, nTermPeptide, cTermPeptide, sequenceList, z );
 			}
 		}
 	}
 }
-void ModificationTable::getNextModification ( int modIndex, const CharVector& expectedResidues, const CharVector& modificationResidues, const CharVector& terminalSpecificities, const string& peptide, bool nTermPeptide, bool cTermPeptide, PeptideSequenceVector& sequenceList, int z ) const
+void ModificationTable::getNextModification ( int modIndex, const ModificationVector& mods, const CharVector& modificationResidues, const string& peptide, bool nTermPeptide, bool cTermPeptide, PeptideSequenceVector& sequenceList, int z ) const
 {
-	char expectedAA = expectedResidues [modIndex];
-	char terminalSpecificity = terminalSpecificities [modIndex];
+	const Modification* localMod = mods [modIndex];
+	if ( !localMod->getOn () ) return;
+	char expectedAA = localMod->getExpectedResidue ();
+	char terminalSpecificity = localMod->getTerminalSpecificity ();
 	if ( z != 0 && expectedAA == '.' ) {
 		for ( ExtraModVectorSizeType i = 0 ; i < extraMods.size () ; i++ ) {
 			const ExtraMod* em = extraMods [i];
@@ -962,9 +1169,9 @@ void ModificationTable::getNextModification ( int modIndex, const CharVector& ex
 	if ( expectedAA == 'n' ) {
 		if ( terminalSpecificity != 'n' || nTermPeptide ) {		// Covers the case of acetylation
 			indexSet.push_back ( -1 );
-			if ( modIndex + 1 < numModResidues ) getNextModification ( modIndex + 1, expectedResidues, modificationResidues, terminalSpecificities, peptide, nTermPeptide, cTermPeptide, sequenceList, z );
+			if ( modIndex + 1 < numModResidues ) getNextModification ( modIndex + 1, mods, modificationResidues, peptide, nTermPeptide, cTermPeptide, sequenceList, z );
 			else {
-				addSequences ( peptide, modificationResidues, sequenceList );
+				addSequences ( peptide, modificationResidues, sequenceList, mods );
 			}
 			indexSet.pop_back ();
 		}
@@ -972,18 +1179,18 @@ void ModificationTable::getNextModification ( int modIndex, const CharVector& ex
 	else if ( expectedAA == 'c' ) {
 		if ( terminalSpecificity != 'c' || cTermPeptide ) {
 			indexSet.push_back ( -2 );
-			if ( modIndex + 1 < numModResidues ) getNextModification ( modIndex + 1, expectedResidues, modificationResidues, terminalSpecificities, peptide, nTermPeptide, cTermPeptide, sequenceList, z );
+			if ( modIndex + 1 < numModResidues ) getNextModification ( modIndex + 1, mods, modificationResidues, peptide, nTermPeptide, cTermPeptide, sequenceList, z );
 			else {
-				addSequences ( peptide, modificationResidues, sequenceList );
+				addSequences ( peptide, modificationResidues, sequenceList, mods );
 			}
 			indexSet.pop_back ();
 		}
 	}
 	else if ( expectedAA == '.' ) {
 		indexSet.push_back ( -3 );
-		if ( modIndex + 1 < numModResidues ) getNextModification ( modIndex + 1, expectedResidues, modificationResidues, terminalSpecificities, peptide, nTermPeptide, cTermPeptide, sequenceList, z );
+		if ( modIndex + 1 < numModResidues ) getNextModification ( modIndex + 1, mods, modificationResidues, peptide, nTermPeptide, cTermPeptide, sequenceList, z );
 		else {
-			addSequences ( peptide, modificationResidues, sequenceList );
+			addSequences ( peptide, modificationResidues, sequenceList, mods );
 		}
 		indexSet.pop_back ();
 	}
@@ -1006,7 +1213,7 @@ void ModificationTable::getNextModification ( int modIndex, const CharVector& ex
 			}
 		}
 		for ( int i = startI ; i < endI ; i++ ) {
-			if ( peptide [i] == expectedAA ) {
+			if ( peptide [i] == expectedAA  && localMod->getOn ( i ) ) {
 				bool uniq = true;
 				for ( IntVectorSizeType j = 0 ; j < indexSet.size () ; j++ ) {	// Checks if residue already modified.
 					if ( indexSet [j] == i ) {
@@ -1016,9 +1223,9 @@ void ModificationTable::getNextModification ( int modIndex, const CharVector& ex
 				}
 				if ( uniq ) {
 					indexSet.push_back ( i );
-					if ( modIndex + 1 < numModResidues ) getNextModification ( modIndex + 1, expectedResidues, modificationResidues, terminalSpecificities, peptide, nTermPeptide, cTermPeptide, sequenceList, z );
+					if ( modIndex + 1 < numModResidues ) getNextModification ( modIndex + 1, mods, modificationResidues, peptide, nTermPeptide, cTermPeptide, sequenceList, z );
 					else {
-						addSequences ( peptide, modificationResidues, sequenceList );
+						addSequences ( peptide, modificationResidues, sequenceList, mods );
 					}
 					indexSet.pop_back ();
 				}
@@ -1026,7 +1233,7 @@ void ModificationTable::getNextModification ( int modIndex, const CharVector& ex
 		}
 	}
 }
-void ModificationTable::addSequences ( const string& peptide, const CharVector& modificationResidues, PeptideSequenceVector& sequenceList ) const
+void ModificationTable::addSequences ( const string& peptide, const CharVector& modificationResidues, PeptideSequenceVector& sequenceList, const ModificationVector& mods ) const
 {
 	newPeptide = peptide;
 	for ( IntVectorSizeType i = 0 ; i < indexSet.size () ; i++ ) {
@@ -1034,8 +1241,20 @@ void ModificationTable::addSequences ( const string& peptide, const CharVector& 
 	}
 	pair <SetStringIterator, bool> flag = sequenceSet.insert ( newPeptide );
 	if ( flag.second ) {
-		sequenceList.push_back ( PeptideSequence ( newPeptide, extraMods ) );
+		addSequence ( sequenceList, mods );
 		if ( maxSequences && sequenceList.size () > maxSequences ) throw ModificationTableMaximumSequencesExceeded ();
+	}
+}
+void ModificationTable::setMotifSites ( const char* frame )
+{
+	for ( int i = 0 ; i < motifVector.size () ; i++ ) {
+		motifVector [i]->setSites ( frame );
+	}
+}
+void ModificationTable::setMotifFlags ( int startAA, int endAA )
+{
+	for ( int i = 0 ; i < motifVector.size () ; i++ ) {
+		motifVector [i]->setFlag ( startAA, endAA );
 	}
 }
 void ModificationTable::initialiseHomology ( const StringVector& homologyNames )
@@ -1078,16 +1297,47 @@ void ModificationTable::initialiseUserModHomology ( const StringVector& usermods
 	for ( StringVectorSizeType i = 0 ; i < usermods.size () ; i++ ) {
 		string u = usermods [i];
 		bool isRare = false;
+		bool protein = false;
+		bool peptide = false;
+		bool site = false;
+		int motifOffset = 0;
+		string motif;
 		int mmLimit = 0;
+		int lab1 = 0;
+		Motif* mp = 0;
 		if ( !u.empty () && u [u.length ()-1] != ')' ) {
 			int exIdx = u.find_last_of ( ")" );
 			string exStr = u.substr ( exIdx + 4 );
-			isRare = ( exStr == "Rare" );
-			if ( isPrefix ( exStr, "Max" ) ) {
+			if ( exStr.find ( "Rare" ) != string::npos ) {
+				isRare = true;
+			}
+			else if ( exStr.find ( "Max" ) != string::npos ) {
 				mmLimit = atoi ( exStr.substr ( 4 ).c_str () );
+			}
+			else if ( exStr.find ( "Label" ) != string::npos ) {
+				lab1 = atoi ( exStr.substr ( 6 ).c_str () );
+				if ( lab1 > labelMods.size () ) labelMods.resize ( lab1 );
+			}
+			if ( exStr.find ( "Protein" ) != string::npos ) {
+				protein = true;
+			}
+			else if ( exStr.find ( "Peptide" ) != string::npos ) {
+				peptide = true;
+			}
+			else if ( exStr.find ( "Site" ) != string::npos ) {
+				site = true;
+			}
+			string::size_type motIdx = exStr.find ( "Motif" );
+			if ( motIdx != string::npos ) {
+				string::size_type end;
+				motIdx += 6;
+				motifOffset = genNextInt ( exStr, " ", motIdx, end );
+				motif = exStr.substr ( motIdx );
+				mp = getMotifPointer ( motif, motifOffset );
 			}
 			u = u.substr ( 0, exIdx + 1 );
 		}
+		bool siteInfo = protein || peptide || site;
 		Usermod umod ( u );
 		string aaList = umod.getAAList ();
 		string outputString = umod.getOutputString ();
@@ -1100,16 +1350,20 @@ void ModificationTable::initialiseUserModHomology ( const StringVector& usermods
 			string modAA ( 1, aa );
 			modAA += '(' + outputString + ')';
 			if ( !genStrcasecmp ( outputString.c_str (), "Phospho" ) ) {
-				modifications.push_back ( new Modification ( aa, tolower (aa), terminalSpecificity ) );
+				modifications.push_back ( new Modification ( aa, tolower (aa), terminalSpecificity, mp ) );
 			}
 			else if ( !genStrcasecmp ( u.c_str (), "Oxidation (M)" ) ) {
-				modifications.push_back ( new Modification ( 'M', 'm', terminalSpecificity ) );
+				modifications.push_back ( new Modification ( 'M', 'm', terminalSpecificity, mp ) );
 			}
 			else {
-				modifications.push_back ( new Modification ( modAA, terminalSpecificity ) );
+				modifications.push_back ( new Modification ( modAA, terminalSpecificity, mp ) );
 			}
 			if ( isRare )	rareMods.insert ( modifications.back () );
 			if ( mmLimit )	mm.insert ( modifications.back () );
+			if ( lab1 )	{
+				labelMods [lab1-1].insert ( modifications.back () );
+				labelModsMap [modifications.back ()] = lab1;
+			}
 		}
 		if ( mmLimit ) {
 			maxMods.push_back ( mm );
@@ -1117,6 +1371,23 @@ void ModificationTable::initialiseUserModHomology ( const StringVector& usermods
 			maxModsCount.push_back ( 0 );
 		}
 	}
+}
+Motif* ModificationTable::getMotifPointer ( const string& motif, int motifOffset )
+{
+	Motif* mp = 0;
+	pair <SetPairStringIntIterator, bool> flag = motifSet.insert ( make_pair ( motif, motifOffset ) );	// Store the motif if unique
+	if ( flag.second ) {		// New motif
+		mp = new Motif ( motif, motifOffset );
+		motifVector.push_back ( mp );
+	}
+	else {
+		for ( int j = 0 ; j < motifVector.size () ; j++ ) {
+			if ( motifVector [j]->getMotif () == motif && motifVector [j]->getOffset () == motifOffset ) {
+				mp = motifVector [j];
+			}
+		}
+	}
+	return mp;
 }
 void ModificationTable::initialiseExtraUserModHomology ()
 {
@@ -1132,6 +1403,12 @@ void ModificationTable::initialiseUserDefinedLinkHomology ( const MapPairStringS
 	string formula		= (*iter).second.getFormula ();
 	string userAMass	= (*iter).second.getUserAMass ();
 	string limit		= (*iter).second.getLimit ();
+	string motifOffset	= (*iter).second.getMotifOffset ();
+	string motif		= (*iter).second.getMotif ();
+	Motif* mp = 0;
+	if ( motifOffset != "Off" && !motif.empty () ) {
+		mp = getMotifPointer ( motif, atoi ( motifOffset.c_str () ) );
+	}
 	if ( !genStrcasecmp ( longName.c_str (), "Dehydro" ) ) dehydroFlag = true;
 	if ( longName.find ( "Cation" ) != string::npos ) cationFlag = true;
 	string aaList;
@@ -1147,7 +1424,7 @@ void ModificationTable::initialiseUserDefinedLinkHomology ( const MapPairStringS
 		modAA += '(' + longName + ')';
 		AAInfo::getInfo ().addModAminoAcid ( aa, longName, formula );
 		if ( !formula.empty () ) {
-			modifications.push_back ( new Modification ( modAA, terminalSpecificity ) );
+			modifications.push_back ( new Modification ( modAA, terminalSpecificity, mp ) );
 		}
 		else {
 			double dOffset = atof ( userAMass.c_str () );
@@ -1157,7 +1434,7 @@ void ModificationTable::initialiseUserDefinedLinkHomology ( const MapPairStringS
 			else if ( aa == 'c' )	constModAdjuster = c_terminus_wt - o_h;
 			else if ( aa == '.' )	constModAdjuster = 0.0;
 			else					constModAdjuster = amino_acid_wt [aa] - massConvert ( AAInfo::getInfo ().getElementalString ( aa ).c_str () );
-			modifications.push_back ( new Modification ( aa + sOffsetStr, dOffset + constModAdjuster, terminalSpecificity, false ) );
+			modifications.push_back ( new Modification ( aa + sOffsetStr, dOffset + constModAdjuster, terminalSpecificity, false, mp ) );
 		}
 		if ( isRare )	rareMods.insert ( modifications.back () );
 		if ( isMax )	mm.insert ( modifications.back () );
@@ -1170,10 +1447,16 @@ void ModificationTable::initialiseUserDefinedLinkHomology ( const MapPairStringS
 }
 void ModificationTable::initialiseMassOffsetModifications ( const ModificationParameters& modParams )
 {
+	int numMotifs = modParams.getNumModMotif ();
+	std::map <std::string, Motif*> motifMap;
+	for ( int ii = 0 ; ii < numMotifs ; ii++ ) {
+		motifMap [modParams.getModMotifAA (ii)] = getMotifPointer ( modParams.getModMotif (ii), modParams.getModMotifOffset (ii) );
+	}
 	StringVector aas = modParams.getCompIon ();
 	bool uncleaved = modParams.getUncleaved ();
 	bool nTermProtein = modParams.getModNTermProtein ();
 	bool cTermProtein = modParams.getModCTermProtein ();
+
 	if ( modParams.getModNeutralLoss () )	aas.push_back ( "." );
 	if ( modParams.getModNTerm () )			aas.push_back ( "n" );
 	if ( modParams.getModCTerm () )			aas.push_back ( "c" );
@@ -1208,7 +1491,12 @@ void ModificationTable::initialiseMassOffsetModifications ( const ModificationPa
 					if ( nTermProtein && a == "n" ) ts = 'n';
 					if ( cTermProtein && a == "c" ) ts = 'c';
 					double mOffset = dOffset - constModAdjuster [j];
-					modifications.push_back ( new Modification ( a [0] + sOffsetStr, mOffset, ts, true ) );
+					Motif* mp = 0;
+					std::map <std::string, Motif*>::const_iterator cur = motifMap.find ( a );
+					if ( cur != motifMap.end () ) {
+						mp = (*cur).second;
+					}
+					modifications.push_back ( new Modification ( a [0] + sOffsetStr, mOffset, ts, true, mp ) );
 					if ( i == startNominal )	mmodStartExact = mOffset / modMaxZ;
 					if ( i == endNominal )		mmodEndExact = mOffset / modMaxZ;
 					massMods = true;
@@ -1274,7 +1562,7 @@ void ModificationTable::getNextMod ( int start, int level )
 							if ( neutralLoss <= 1 ) {
 								if ( cationFlag && m->getCation () )cat++;
 								if ( ( !cationFlag || cat <= 1 ) ) {
-									if ( checkMaxAndRare ( level ) ) {
+									if ( checkMaxRareAndLabel ( level ) ) {
 										if ( level + 1 < numLevels )
 											getNextMod ( i, level + 1 );
 										else {
@@ -1323,7 +1611,7 @@ bool ModificationTable::checkDehydro ( ModificationVectorSizeType lev )	// There
 	}
 	return genIsEven ( n );
 }
-bool ModificationTable::checkMaxAndRare ( ModificationVectorSizeType lev )
+bool ModificationTable::checkMaxRareAndLabel ( ModificationVectorSizeType lev )
 {
 	if ( rare ) {
 		int n = 0;
@@ -1331,6 +1619,12 @@ bool ModificationTable::checkMaxAndRare ( ModificationVectorSizeType lev )
 			if ( rareMods.find ( mods [i] ) != rareMods.end () ) {
 				n++;
 				if ( n > rare ) return false;
+			}
+			else if ( modRare ) {
+				if ( mods [i]->getMmod () ) {
+					n++;
+					if ( n > rare ) return false;
+				}
 			}
 		}
 	}
@@ -1342,6 +1636,37 @@ bool ModificationTable::checkMaxAndRare ( ModificationVectorSizeType lev )
 					maxModsCount [j]++;
 					if ( maxModsCount [j] > maxModsLimit [j] ) return false;
 				}
+			}
+		}
+	}
+	if ( label ) {
+		int id1 = -1;
+		SetChar aaModLabel;		// List of labelled aas
+		SetChar aaMod;			// List of unlabelled aas
+		for ( ModificationVectorSizeType i = 0 ; i <= lev ; i++ ) {
+			bool labelled = false;
+			for ( VectorModificationSetSizeType j = 0 ; j < labelMods.size () ; j++ ) {
+				if ( labelMods [j].find ( mods [i] ) != labelMods [j].end () ) {
+					if ( id1 == -1 ) {
+						id1 = j;
+					}
+					else {
+						if ( j != id1 ) {
+							return false;		// Mods of 2 different levels (can be different amino acids)
+						}
+					}
+					aaModLabel.insert ( mods [i]->getExpectedResidue () );
+					labelled = true;
+					break;
+				}
+			}
+			if ( !labelled ) {
+				aaMod.insert ( mods [i]->getExpectedResidue () );
+			}
+		}
+		if ( id1 != -1 ) {
+			for ( SetCharConstIterator i = aaModLabel.begin () ; i != aaModLabel.end () ; i++ ) {
+				if ( aaMod.find ( *(i) ) != aaMod.end () ) return false;	// Disallow a labelled and unlabelled mod on the same residue
 			}
 		}
 	}
