@@ -1003,10 +1003,11 @@ void SiteScores::add ( const string& peptide, const string& mods, int start, int
 				int ssIdx = (*cur2).second;
 				int score = scores [j];
 				MapIntToPairIntIntIterator cur = siteScores [ssIdx].find ( site );
+				int oldScore = (*cur).second.first;
 				if ( cur == siteScores [ssIdx].end () ) {
 					siteScores [ssIdx][site] = make_pair ( score, index );
 				}
-				else if ( score > (*cur).second.first ) {
+				else if ( oldScore != -1 && ( score == -1 || score > oldScore ) ) {
 					(*cur).second.first = score;
 					(*cur).second.second = index;
 				}
